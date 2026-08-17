@@ -1,0 +1,168 @@
+"""Preprocessing version stamp.
+
+Every :class:`skinlib.types.AnalysisResult` carries ``PREPROCESSING_VERSION``.
+Longitudinal comparisons are only valid between results sharing a version.
+
+See README "Version bump rule" for when to bump.
+"""
+
+from __future__ import annotations
+
+# MAJOR.MINOR.PATCH
+#   MAJOR  incompatible result shape (metric added/removed/renamed, region set changed)
+#   MINOR  output values can shift (threshold default, mask model, algorithm change)
+#   PATCH  provably value-preserving (docs, typing, refactor with byte-identical output)
+# 8.0.0  `too_dark` now fires on INFORMATION LOSS rather than on darkness.
+#        The old gate thresholded mean skin L* at 32.0, which rejected
+#        correctly exposed deep skin by construction. Inverting the ITA scale
+#        against published skin colorimetry (Chardon/Del Bino), mean L* of
+#        correctly exposed skin is:
+#          ITA class        b*=12  b*=16  b*=20
+#          dark (<-30)       43.1   40.8   38.5
+#          dark deep (~-50)  35.7   30.9   26.2   <- partly rejected
+#          dark deepest      24.3   15.7    7.1   <- always rejected
+#        so the floor began rejecting at ITA -42 to -56 depending on b*, while
+#        `monk_ita_edges` reaches -30: the library claimed to CLASSIFY skin its
+#        own gate refused to MEASURE. Two constants in one repo disagreeing —
+#        provable without any dataset, which three separate empirical audits
+#        against Fitzpatrick17k could not manage (21 faces from 188 images, and
+#        zero at both Fitzpatrick I and VI).
+#        `too_dark` now keys on `shadow_clipped_fraction` > 0.02, which is
+#        tone-independent: real underexposure crushes pixels against black and
+#        destroys information, dark skin merely reflects less. 0.02 is ~10x the
+#        worst observed good capture (0.00199) and does catch the genuinely
+#        dark clinical image measured at 0.027. `luminance_band` drops to
+#        (12.0, 82.0) and its lower bound is now a no-signal backstop only.
+#        `blurry` had the SAME defect and is fixed the same way. Laplacian
+#        variance scales with contrast and contrast scales with reflected
+#        light, so an absolute bar on it rejected darker skin as out of focus.
+#        On one unchanged photo scaled toward deeper tones the linear measure
+#        swung 11.7x (68.8 -> 5.9) while a log-domain measure moved 1.16x
+#        (0.000944 -> 0.000813). Focus is now the variance of the Laplacian of
+#        LOG luminance — the same argument `log_luminance` already made for
+#        `roughness`, never applied here — with a threshold of 0.0004: 2.2x
+#        below the worst good capture across all five sets (0.00087) and 4.9x
+#        above a sigma=1 blur (0.000082). Genuine blur still separates by 13.7x.
+#        The linear measure stays in QualityResult.measures for inspection.
+#        Also: `analyze_session` computed lesions and discarded them; the
+#        records are now returned on `SessionResult.spots`/`.lesions` from the
+#        reference frame, for display rather than tracking.
+#        MAJOR: flag semantics changed; SessionResult gained fields.
+# 7.0.0  Regions are cut in the face's own 3D frame (new canonical.py) instead
+#        of the 2D image-plane projection, so a threshold stops sliding across
+#        anatomy when the head turns. Every per-region metric shifts.
+#        Measured on the `angle` set against `constant`, median per-region
+#        penalty: spot_burden 4.63x -> 3.87x, inflammation_burden 4.58x ->
+#        3.79x, roughness 4.33x -> 3.61x, uniformity 5.46x -> 5.04x,
+#        melanin_density 6.19x -> 6.40x (no gain).
+#        Region drift is therefore real but explains only ~20% of the angle
+#        penalty. The residual 3.87x is most likely irreducible: a turned head
+#        shows different skin at a different sampling density, which no frame
+#        recovers. Costs ~50ms; total region area moves 1%.
+#        MAJOR: per-region values change.
+# 6.0.0  Surface geometry and derived quantities. `Face.landmarks_z` retains
+#        the depth MediaPipe always returned and the library used to discard;
+#        new `geometry.py` builds a depth surface, per-pixel normals, and a
+#        least-squares light direction. New `derived.py` adds left/right
+#        asymmetry and a periorbital decomposition splitting under-eye darkness
+#        into pigment, vascular and structural parts.
+#        Validated: normals are unit vectors, forehead reads cos 0.95 against
+#        the chin's 0.63 (a plane against the jawline), and the light solver
+#        recovers a synthetic Lambertian illuminant to r^2 > 0.98.
+#        NEGATIVE RESULT, recorded in geometry.py: incidence is a real covariate
+#        of the per-region metrics (mean |r| 0.51 for spot_burden across the
+#        angle set) but NOT a correctable one — its sign is inconsistent between
+#        regions (forehead +0.50, nose -0.85, perioral +0.61, periorbital_left
+#        -0.80), so no single divisor can help. The likeliest cause is that the
+#        angle penalty is region-mask drift under out-of-plane rotation rather
+#        than shading, which would make 3D canonical region definition the real
+#        fix. Incidence is therefore offered as a weight, never a divisor.
+#        Also a pure-performance pass, provably value-preserving: `analyze`
+#        builds each expensive map once instead of letting the spot detector,
+#        the lesion detector and the burden metrics each rebuild it. The
+#        chromophore separation ran 3x per frame and the large-kernel median 4x;
+#        `_valid_pixels` rescanned the full frame on all ten region calls.
+#        analyze() 6303ms -> 3102ms, suite 155s -> 90s, output bit-identical.
+#        MAJOR: Face gained a field and new public modules landed; no metric
+#        column changed.
+# 5.0.0  Burst analysis: `analyze_session` plus `SessionResult`, `FrameReport`
+#        and `SessionConfig`. Metrics are unchanged; this adds a second entry
+#        point beside `analyze`, so stored single-frame results stay valid.
+#        Ten frames over two seconds feel like one photo and buy averaging,
+#        frame selection, and a per-session error bar measured on THIS capture
+#        rather than assumed. Measured on the 12-frame `constant` burst:
+#          detectable change   1 frame -> 10-frame session
+#          spot_burden         0.00302 -> 0.00102
+#          spot_count            28.7  ->   11.4
+#        Frame selection is relative to the burst, never absolute: Laplacian
+#        variance depends on how much detail a face has. One illuminant is
+#        estimated for the whole burst from the frame with the most confident
+#        sclera, since re-estimating per frame injects the estimator's own
+#        noise into every colour metric.
+#        Specular recovery from between-frame variation is present but OFF and
+#        measured NOT to work — it tracks edge gradient (r = +0.551) rather
+#        than luminance (r = -0.221, wrong sign), i.e. registration residual at
+#        the lash line rather than glare. Gating out edges removes the artifact
+#        and leaves no signal (T-zone/cheek 1.27x -> 1.08x). See SessionConfig.
+#        MAJOR: new public result type; no metric column changed.
+# 4.0.0  ACTIVE inflammation, from local haemoglobin excess. Added
+#        `inflammation_burden` and `inflammation_contrast`, plus
+#        `detect_lesions` returning the new `Lesion` type and
+#        `AnalysisResult.lesions`. The melanin family sees a healed mark; this
+#        one sees the lesion itself, which acne being red and melanin brown
+#        made structurally impossible before.
+#        Measured on the AE-locked sets, the inflammation family is markedly
+#        more ROBUST than the melanin one even though it is noisier at rest,
+#        because haemoglobin density has shading and exposure projected out
+#        analytically before the local residual is taken:
+#          baseline noise / distance / angle
+#          spot_contrast          0.00044 | 60.6x | 30.3x
+#          inflammation_contrast  0.00234 |  3.6x |  2.0x
+#          spot_burden            0.00109 |  3.0x |  5.9x
+#          inflammation_burden    0.00196 |  2.1x |  2.5x
+#        `detect_spots` was refactored onto the shared `_components` extractor
+#        it now uses with `detect_lesions`; spot output is unchanged and pinned
+#        by test_refactor_preserved_spot_detection.
+#        MAJOR: columns added, AnalysisResult gained a field.
+# 3.0.0  Added `spot_burden` and `spot_contrast`, continuous replacements for
+#        `spot_count`. Measured across 12 identical AE-locked captures, the
+#        count's noise IS counting statistics: observed CV tracked 1/sqrt(N) at
+#        every filter stage (ratios 1.02, 0.85, 1.11, 1.46), so at N=50 it
+#        cannot beat +-7 spots however good the detector. Tuning confirmed it —
+#        hysteresis seeding gave 0.204 against 0.206, and raising the area floor
+#        made it worse as N fell (0.21 -> 0.30 -> 0.74 at N = 7 -> 5 -> 2).
+#        Dropping the discretisation removes the floor entirely:
+#          spot_count 0.206 | spot_area_fraction 0.130
+#          spot_burden 0.007 | spot_contrast 0.004
+#        Sensitivity holds — burden spans 76x across regions of one face and
+#        2.4x across four faces. Both read the melanin residual directly, so
+#        unlike spot_count they do not require the detector to have run.
+#        MAJOR: columns added.
+# 2.0.0  Roughness band-pass sigma scales with face width instead of being a
+#        fixed 3.0px. A fixed sigma band-passes a different physical scale at
+#        every capture distance: measured across the allowed distance band on
+#        an unchanged skin patch it swung roughness 0.0473 -> 0.1031 (2.2x),
+#        which a tracker reported as rougher skin when the subject had only
+#        stood closer. Face-relative holds the same patch to 3.4%. Every
+#        stored `roughness` and `roughness_rel` changes.
+#        Added `melanin_density` and `hemoglobin_density`: melanin/haemoglobin
+#        coordinates in optical-density space with the (1,1,1) shading axis
+#        projected out analytically (Tsumura). Against a shading gradient and
+#        a +1/3 stop exposure change they move -0.0089 / +0.0027 where
+#        `melanin_index` moves +0.0875 / -0.0754. Unlike the _rel family they
+#        can see a face-wide pigment shift, which self-normalisation cancels
+#        by construction. MAJOR: columns added, roughness changed value.
+# 1.0.0  Log-domain erythema (log10 R/G) and roughness (band-pass of log
+#        luminance), so exposure cancels rather than approximately cancelling.
+#        Added self-normalised <metric>_rel columns and the D(x,y) map.
+#        Absolute tone metrics marked internal-only. Sclera confidence
+#        recalibrated against observed pixel counts. MAJOR: columns added,
+#        roughness changed meaning.
+# 0.3.0  Spot threshold default 3.0 -> 2.2, calibrated against a hand-labelled
+#        face (recall 0.33 -> 0.78, F1 0.40 -> 0.78). See tools/evaluate.py.
+# 0.2.0  Colour metrics moved to float32 CIELAB (8-bit Lab quantised a* to
+#        integer steps, capping `erythema` resolution at ~1 unit against a
+#        measured noise floor of 0.13). Spot detection: MAD-based threshold,
+#        absolute minimum area, shape tests gated on area, whole-component
+#        boundary rejection. All of these shift stored values.
+PREPROCESSING_VERSION: str = "8.0.0"

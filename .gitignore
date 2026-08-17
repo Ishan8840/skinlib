@@ -1,0 +1,8 @@
+models/
+*.pth
+*.task
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+visualization.png
