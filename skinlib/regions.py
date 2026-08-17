@@ -125,13 +125,43 @@ def _coordinate_fields(shape: tuple[int, int], frame: lm.FaceFrame) -> tuple[np.
 # ---------------------------------------------------------------------------
 
 
+# Two-entry memo for the polygon build, which is the single most expensive step
+# in a frame at ~253ms and was being run TWICE per frame: `_suppress_facial_hair`
+# needs region geometry to know where the lower face is, and `build_regions`
+# then rebuilds the same polygons from the same face and config moments later.
+#
+# Keyed on object identity, and the entry holds strong references to both keys.
+# That is what makes id() safe here — a live reference cannot be collected, so
+# its id cannot be recycled onto a different object while the entry stands.
+# Two entries rather than one so a caller alternating between two configs (the
+# A/B pattern used throughout this library's own tooling) still hits.
+_POLYGON_MEMO: list[tuple[Face, Config, dict[str, np.ndarray]]] = []
+_POLYGON_MEMO_SIZE = 2
+
+
 def build_region_polygons(face: Face, config: Config | None = None) -> dict[str, np.ndarray]:
     """Region geometry from landmarks alone, before any skin-mask intersection.
 
     Returns one boolean mask per name in ``REGION_NAMES``. Overlaps are still
     present at this stage; ``build_regions`` resolves them.
+
+    Memoised on the identity of ``face`` and ``config``; see ``_POLYGON_MEMO``.
+    The returned masks are treated as read-only by every caller in this package.
     """
     config = config or Config()
+
+    for cached_face, cached_config, polygons in _POLYGON_MEMO:
+        if cached_face is face and cached_config is config:
+            return polygons
+
+    polygons = _build_region_polygons(face, config)
+    _POLYGON_MEMO.append((face, config, polygons))
+    del _POLYGON_MEMO[:-_POLYGON_MEMO_SIZE]
+    return polygons
+
+
+def _build_region_polygons(face: Face, config: Config) -> dict[str, np.ndarray]:
+    """The actual build. Uncached, so tests can measure it directly."""
     region_config = config.regions
 
     shape = face.image_size

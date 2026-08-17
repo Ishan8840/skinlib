@@ -225,6 +225,58 @@ def test_trusted_change_uses_the_blunter_of_the_two_sessions() -> None:
     assert not sharp.trusted_change("spot_burden", blunt)
 
 
+def test_rejected_frames_do_not_reach_the_metrics(analysed, full_config, parser) -> None:
+    """Selection must actually exclude, even when every frame shares a name.
+
+    Frames were rejoined to their pixel data BY NAME. An ndarray source is named
+    "<array>", so a whole burst shared one name and the set-membership test
+    admitted frames selection had just rejected — which then contaminated
+    `noise`, `standard_error` and `detectable_change`, the very numbers the
+    burst path exists to produce. `a/IMG_0001.jpg` and `b/IMG_0001.jpg` collided
+    identically.
+
+    Four still frames plus one zoomed frame that `_select` rejects as "moved".
+    """
+    loaded, _face, _skin, _regions = analysed
+    image = loaded.image
+    height, width = image.shape[:2]
+
+    # A centre crop resized back: same face, visibly larger, so face_width moves
+    # well past `face_width_tolerance`.
+    margin_y, margin_x = height // 6, width // 6
+    zoomed = cv2.resize(
+        image[margin_y : height - margin_y, margin_x : width - margin_x],
+        (width, height),
+        interpolation=cv2.INTER_AREA,
+    )
+
+    session = analyze_session(
+        [image, image, image, image, zoomed], config=full_config, parser=parser
+    )
+
+    rejected = [r for r in session.frames if not r.kept]
+    assert rejected, "the zoomed frame should have been rejected"
+    # Every frame is named "<array>"; the join must not rely on that.
+    assert len({r.name for r in session.frames}) == 1
+
+    # The count that actually matters: only kept frames may contribute.
+    contributing = sum(1 for r in session.frames if r.kept and r.metrics)
+    assert contributing == session.n_kept
+    assert contributing == len(session.frames) - len(rejected)
+
+
+def test_per_frame_metrics_land_on_the_right_report(analysed, full_config, parser) -> None:
+    """The name lookup always resolved to index 0, so all metrics piled onto it."""
+    loaded, _face, _skin, _regions = analysed
+    session = analyze_session(
+        [loaded.image, loaded.image, loaded.image], config=full_config, parser=parser
+    )
+    populated = [r for r in session.frames if r.kept and r.metrics]
+    assert len(populated) == session.n_kept, (
+        "each kept frame must carry its own metrics, not just the first"
+    )
+
+
 def test_specular_recovery_is_off_by_default() -> None:
     """It measured registration residual, not glare. See SessionConfig."""
     assert Config().session.recover_specular is False

@@ -27,6 +27,7 @@ were that morning.
 
 from __future__ import annotations
 
+from contextlib import ExitStack
 from pathlib import Path
 
 import cv2
@@ -34,7 +35,7 @@ import numpy as np
 
 from .color import apply_gains, correct_color
 from .config import Config, config_fingerprint
-from .detect import detect_face, load_image
+from .detect import detect_face, load_image, load_landmarker
 from .metrics import compute_metrics
 from .parse import load_parser, parse_skin, weights_hash
 from .quality import check_quality
@@ -252,6 +253,7 @@ def analyze_session(
     sources: list[str | Path | np.ndarray],
     config: Config | None = None,
     parser=None,
+    landmarker=None,
 ) -> SessionResult:
     """Analyse a burst of frames captured as one moment.
 
@@ -265,14 +267,35 @@ def analyze_session(
     config = config or Config()
     session_config = config.session
     model = parser if parser is not None else load_parser(config)
+    # One landmarker for the whole burst. Building one costs ~182ms against
+    # ~24ms to detect, so a ten-frame burst that rebuilt per frame spent ~1.8s
+    # on construction alone. Closed in the finally below when we built it;
+    # a caller-supplied one is the caller's to close.
+    with ExitStack() as stack:
+        if landmarker is None:
+            landmarker = stack.enter_context(load_landmarker(config))
+        return _analyze_session(sources, config, model, landmarker)
 
-    loaded_frames: list[tuple[str, np.ndarray, Face, np.ndarray, dict]] = []
+
+def _analyze_session(sources, config: Config, model, landmarker) -> SessionResult:
+    """The body of ``analyze_session``, with both handles guaranteed live."""
+    session_config = config.session
+
+    # Keyed on the REPORT INDEX, never on the frame name. A name is
+    # `Path(source).name`, or the literal "<array>" for an ndarray, so names are
+    # not unique: every ndarray in a burst shares one, and `a/IMG_0001.jpg`
+    # collides with `b/IMG_0001.jpg`. Joining the selection verdict back to
+    # pixel data by name therefore admitted frames that `_select` had just
+    # rejected, and they went on to contaminate `noise`, `standard_error` and
+    # `detectable_change` — defeating the one guarantee the burst path exists
+    # to provide. Names are for humans reading a FrameReport.
+    loaded_frames: list[tuple[int, np.ndarray, Face, np.ndarray, dict]] = []
     reports: list[FrameReport] = []
 
     for source in sources:
         name = Path(source).name if isinstance(source, (str, Path)) else "<array>"
         loaded = load_image(source, config.io)
-        face = detect_face(loaded.image, config)
+        face = detect_face(loaded.image, config, landmarker=landmarker)
         if face is None:
             reports.append(FrameReport(name=name, kept=False, rejected="no_face"))
             continue
@@ -301,11 +324,10 @@ def analyze_session(
                 face_width=float(face.width),
             )
         )
-        loaded_frames.append((name, loaded.image, face, skin, regions))
+        loaded_frames.append((len(reports) - 1, loaded.image, face, skin, regions))
 
     reports = _select(reports, config)
-    keep = {r.name for r in reports if r.kept}
-    kept = [f for f in loaded_frames if f[0] in keep]
+    kept = [frame for frame in loaded_frames if reports[frame[0]].kept]
 
     fingerprints = dict(
         version=PREPROCESSING_VERSION,
@@ -332,9 +354,7 @@ def analyze_session(
     # assumption about the scene.
     corrections = [correct_color(image, face, skin, config) for _, image, face, skin, _ in kept]
     for report_index, correction in enumerate(corrections):
-        index = next(
-            i for i, r in enumerate(reports) if r.name == kept[report_index][0]
-        )
+        index = kept[report_index][0]
         reports[index] = FrameReport(
             name=reports[index].name,
             kept=reports[index].kept,
@@ -392,7 +412,7 @@ def analyze_session(
     lesion_counts: list[int] = []
     first_frame_lesions: list = []
     first_frame_spots: list = []
-    for index, (name, _image, face, skin, regions) in enumerate(kept):
+    for index, (report_index, _image, face, skin, regions) in enumerate(kept):
         image = corrected[index]
         # Same map sharing as `analyze`: the chromophore separation and the two
         # large-kernel medians dominate per-frame cost, and every consumer below
@@ -424,7 +444,7 @@ def analyze_session(
         per_frame.append(result.global_)
         per_frame_regions.append(result.by_region)
 
-        position = next(i for i, r in enumerate(reports) if r.name == name)
+        position = report_index
         reports[position] = FrameReport(
             name=reports[position].name,
             kept=True,

@@ -31,7 +31,7 @@ from .config import (
     config_fingerprint,
 )
 from .derived import asymmetry, periorbital_decomposition
-from .detect import detect_face, load_image
+from .detect import detect_face, load_image, load_landmarker
 from .geometry import (
     depth_surface,
     estimate_light_direction,
@@ -130,6 +130,7 @@ __all__ = [
     "region_incidence",
     "surface_normals",
     "detect_face",
+    "load_landmarker",
     "detect_lesions",
     "detect_spots",
     "hemoglobin_residual",
@@ -149,6 +150,7 @@ def analyze(
     source: str | Path | np.ndarray,
     config: Config | None = None,
     parser=None,
+    landmarker=None,
 ) -> AnalysisResult:
     """Run the full pipeline.
 
@@ -166,13 +168,14 @@ def analyze(
     for a real reading. Set ``QualityConfig.short_circuit_when_unusable`` to
     False to compute anyway when debugging.
 
-    Pass ``parser`` (from ``load_parser``) when analysing many images, to avoid
-    reloading the checkpoint every call.
+    Pass ``parser`` (from ``load_parser``) and ``landmarker`` (from
+    ``load_landmarker``) when analysing many images. Both are built per call
+    otherwise, and the landmarker costs ~182ms to build against ~24ms to run.
     """
     config = config or Config()
 
     loaded = load_image(source, config.io)
-    face = detect_face(loaded.image, config)
+    face = detect_face(loaded.image, config, landmarker=landmarker)
 
     fingerprint = config_fingerprint(config)
     landmarker_fingerprint = _landmarker_hash(config)
