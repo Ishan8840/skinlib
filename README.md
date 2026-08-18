@@ -635,12 +635,45 @@ never been applied to the blur check. Genuine blur still separates by 13.7x
 
 Pinned by `test_darker_skin_is_not_blur` and `test_genuine_blur_is_still_caught`.
 
-Both bugs share a root cause: **an absolute threshold on a quantity that scales
-with reflected light**. Together they made deep skin tones unmeasurable however
-good the capture was. Neither was found by an empirical audit — both fell out of
-asking what the threshold means physically.
+**`too_bright` was the same bug mirrored**, and 8.0.0 fixed only one tail of a
+symmetric argument. Mean L\* rises with skin *lightness* as much as with
+exposure, so the L\* > 82 ceiling was wrong in both directions at once: it would
+reject correctly exposed very light skin (ITA > 55 reaches L\* 84.6 at b\* = 20)
+while staying silent on a capture with 17% of the skin already blown out. It now
+keys on `highlight_clipped_fraction` > 0.02, mirroring the shadow threshold.
 
-**This does not close the fairness question.** It fixes one threshold that was
+**`high_specular` was the worst of the four** — it did not shift on darker skin,
+it stopped working. `V >= 0.92` is unreachable once median V is 0.59, so the
+specular fraction measured 0.00628 → **exactly 0.00000** as one unchanged photo
+was scaled toward deeper tones. Shine was undetectable on anything but light
+skin. A highlight is bright *relative* to the diffuse level around it, so the
+threshold is now `V > 1.25 × median(V over skin)`, which holds 0.00688 → 0.00471
+across the same range and reproduces the old measure on the unchanged image.
+
+### The sweep, and what it cleared
+
+Four flags shared one root cause: **an absolute threshold on a quantity that
+scales with reflected light**. Every remaining `QualityConfig` threshold was
+then measured the same way — one unchanged photo, scaled toward deeper tones:
+
+| measure | swing | verdict |
+|---|---|---|
+| `specular_fraction` | 0.00628 → 0.00000 | broken, fixed |
+| `hf_energy` | 1.10× | acceptable |
+| `side_lit_ratio` | 1.08× | tone-independent |
+| `scale_ratio`, `texture_ratio` | 1.01–1.02× | clean |
+
+So the pattern is **closed**, not open-ended. In particular `side_lit` firing on
+12/12 of the baseline captures is not a fairness defect — the measure is
+tone-independent, and it is correctly reporting that the lighting in those
+captures is genuinely directional.
+
+None of the four was found by an empirical audit. Three separate runs against
+Fitzpatrick17k produced 21 usable faces and answered nothing. All four fell out
+of asking what a threshold means physically — and two of them surfaced only
+while verifying the fix to a previous one.
+
+**This does not close the fairness question.** It fixes thresholds that were
 provably wrong. Whether MediaPipe and BiSeNet detect and parse darker faces as
 reliably is upstream of this library and still unmeasured — see
 `tools/tone_audit.py`, and note that three runs against Fitzpatrick17k could not
