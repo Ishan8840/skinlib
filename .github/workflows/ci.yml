@@ -14,6 +14,15 @@ jobs:
         with:
           python-version: "3.11"   # MediaPipe has no wheels for 3.14
 
+      # MediaPipe links against OpenGL/EGL even in IMAGE running mode, and
+      # OpenCV wants glib. A bare ubuntu-latest runner has neither, which
+      # surfaces as `OSError: libEGL.so.1: cannot open shared object file`
+      # at import time rather than as anything resembling a test failure.
+      - name: System libraries
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends libegl1 libgl1 libglib2.0-0
+
       # The two checkpoints are ~57MB and are not in the repository, by design:
       # a model downloaded at analysis time could silently swap between two
       # sessions of a longitudinal series, which is the one failure this
