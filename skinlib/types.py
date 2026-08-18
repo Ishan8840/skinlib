@@ -362,6 +362,33 @@ class SessionResult:
     spots: list[Spot] = field(default_factory=list)
     lesions: list[Lesion] = field(default_factory=list)
 
+    # Detections per region per 100k skin pixels, MEDIANED across kept frames.
+    #
+    # This is the "which part of the face" answer, and it is the only regional
+    # signal measured to agree with hand labels. `spot_burden` per region — the
+    # fraction of pixels over a threshold — correlates -0.16 with where marks
+    # actually are and picks the wrong top region on 5 of 5 labelled faces,
+    # because it responds to shading and mask boundaries rather than to marks.
+    # Detection density correlates +0.56 and gets the coarse zone right 3 of 5.
+    #
+    # Aggregated because a single frame's detections are near-Poisson: errors
+    # are close to independent per spot, so a median across the burst is
+    # substantially steadier than any one frame.
+    mark_density: dict[str, float] = field(default_factory=dict)
+    lesion_density: dict[str, float] = field(default_factory=dict)
+
+    def worst_regions(self, kind: str = "mark", top: int = 3) -> list[tuple[str, float]]:
+        """The regions carrying the most detections, densest first.
+
+        Density rather than raw count, or a large region wins simply by being
+        large. Read this as "roughly where", never as "how many" — the detector
+        behind it scores F1 ~0.42 per spot, and it is only useful at all because
+        those errors average out over a region.
+        """
+        source = self.lesion_density if kind == "lesion" else self.mark_density
+        ranked = sorted(source.items(), key=lambda kv: kv[1], reverse=True)
+        return [(name, value) for name, value in ranked if value > 0][:top]
+
     version: str = ""
     config_hash: str = ""
     weights_hash: str = ""

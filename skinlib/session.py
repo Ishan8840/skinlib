@@ -409,6 +409,12 @@ def _analyze_session(sources, config: Config, model, landmarker) -> SessionResul
     lesion_counts: list[int] = []
     first_frame_lesions: list = []
     first_frame_spots: list = []
+    # Per-frame regional detection density, medianed at the end. Detection
+    # errors are close to independent per spot, so averaging across the burst
+    # is what makes a regional answer usable from a per-spot detector that is
+    # only right about half the time.
+    mark_rows: list[dict[str, float]] = []
+    lesion_rows: list[dict[str, float]] = []
     for index, (report_index, _image, face, skin, regions) in enumerate(kept):
         image = corrected[index]
         # Same map sharing as `analyze`: the chromophore separation and the two
@@ -432,6 +438,18 @@ def _analyze_session(sources, config: Config, model, landmarker) -> SessionResul
         if index == 0:
             first_frame_lesions = lesions
             first_frame_spots = spots
+
+        areas = {name: int(mask.sum()) for name, mask in regions.items()}
+        for records, sink in ((spots, mark_rows), (lesions, lesion_rows)):
+            counts: dict[str, int] = {}
+            for record in records:
+                if record.region:
+                    counts[record.region] = counts.get(record.region, 0) + 1
+            sink.append({
+                name: counts.get(name, 0) / (area / 1e5)
+                for name, area in areas.items()
+                if area >= config.metrics.min_region_pixels
+            })
         result = compute_metrics(
             image, skin, regions, config, spots=spots, face=face,
             melanin_residual_map=melanin_res,
@@ -467,11 +485,26 @@ def _analyze_session(sources, config: Config, model, landmarker) -> SessionResul
         composite=composite,
         spots=first_frame_spots,
         lesions=first_frame_lesions,
+        mark_density=_median_rows(mark_rows),
+        lesion_density=_median_rows(lesion_rows),
         version=version,
         config_hash=config_hash,
         weights_hash=weights,
         landmarker_hash=landmarker_fingerprint,
     )
+
+
+def _median_rows(rows: list[dict[str, float]]) -> dict[str, float]:
+    """Per-region median across frames. Median, not mean: one frame that caught
+    a stray highlight should not set a region's score."""
+    if not rows:
+        return {}
+    names = sorted({name for row in rows for name in row})
+    return {
+        name: float(np.median([row[name] for row in rows if name in row]))
+        for name in names
+        if any(name in row for row in rows)
+    }
 
 
 def _session_flags(

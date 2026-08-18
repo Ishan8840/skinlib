@@ -12,6 +12,25 @@ from __future__ import annotations
 #   MAJOR  incompatible result shape (metric added/removed/renamed, region set changed)
 #   MINOR  output values can shift (threshold default, mask model, algorithm change)
 #   PATCH  provably value-preserving (docs, typing, refactor with byte-identical output)
+# 13.0.0 Regional detection density, aggregated across the burst, as the
+#        "which part of the face" answer: SessionResult.mark_density /
+#        .lesion_density and .worst_regions().
+#        Per-region `spot_burden` was the obvious candidate and is measured
+#        WRONG for this. Against hand labels on five faces it correlates -0.16
+#        with where marks actually are and picks the wrong top region on 5 of
+#        5, favouring periorbital and nose — the shading and mask-boundary
+#        regions — because it counts pixels over a threshold and boundaries
+#        clear that threshold. Eroding the mask moves it to only +0.10 and
+#        still 0 of 5, so it is not recoverable by filtering.
+#        Detection density instead correlates +0.56, matches the exact region
+#        2 of 5 and the coarse zone 3 of 5, on a detector scoring F1 ~0.42 per
+#        spot — it works at all only because per-spot errors are near
+#        independent and average out over a region, which is also why it is
+#        medianed across the burst rather than taken from one frame.
+#        NOT YET MEASURED: the burst aggregation itself. Every labelled face
+#        available is a single image, not a burst, so the gain over single
+#        frame is expected but unverified.
+#        MINOR: new fields, no existing metric changes.
 # 12.0.0 An absolute FLOOR under the MAD threshold, because the relative bar
 #        scaled with each face's own noise: a quiet face got a low bar and the
 #        detector filled it with whatever was locally unusual. Measured on two
@@ -283,4 +302,4 @@ from __future__ import annotations
 #        measured noise floor of 0.13). Spot detection: MAD-based threshold,
 #        absolute minimum area, shape tests gated on area, whole-component
 #        boundary rejection. All of these shift stored values.
-PREPROCESSING_VERSION: str = "12.0.0"
+PREPROCESSING_VERSION: str = "13.0.0"
