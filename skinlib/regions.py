@@ -173,16 +173,17 @@ def _build_region_polygons(face: Face, config: Config) -> dict[str, np.ndarray]:
     # region threshold keeps landing on the same anatomy. The 2D frame is an
     # image-plane projection and does not. Falls back silently when there is no
     # depth, so old detections still work.
-    projector = _Frame2D(frame, points)
+    projector: _Frame2D | _Frame3D = _Frame2D(frame, points)
     if region_config.canonical_frame:
         from .canonical import canonical_fields, canonical_frame as _canonical_frame
         from .canonical import _points_3d
 
         canonical = _canonical_frame(face)
         fields = canonical_fields(face, shape) if canonical is not None else None
-        if canonical is not None and fields is not None:
+        points_3d = _points_3d(face)
+        if canonical is not None and fields is not None and points_3d is not None:
             lateral, vertical = fields
-            projector = _Frame3D(canonical, _points_3d(face))
+            projector = _Frame3D(canonical, points_3d)
         else:
             lateral, vertical = _coordinate_fields(shape, frame)
     else:

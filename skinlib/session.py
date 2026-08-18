@@ -328,12 +328,10 @@ def _analyze_session(sources, config: Config, model, landmarker) -> SessionResul
     reports = _select(reports, config)
     kept = [frame for frame in loaded_frames if reports[frame[0]].kept]
 
-    fingerprints = dict(
-        version=PREPROCESSING_VERSION,
-        config_hash=config_fingerprint(config),
-        weights_hash=weights_hash(config.parse),
-        landmarker_hash=_landmarker_hash(config),
-    )
+    version = PREPROCESSING_VERSION
+    config_hash = config_fingerprint(config)
+    weights = weights_hash(config.parse)
+    landmarker_fingerprint = _landmarker_hash(config)
 
     if not kept:
         return SessionResult(
@@ -341,7 +339,10 @@ def _analyze_session(sources, config: Config, model, landmarker) -> SessionResul
             by_region={},
             frames=reports,
             flags=["no_usable_frames"],
-            **fingerprints,
+            version=version,
+            config_hash=config_hash,
+            weights_hash=weights,
+            landmarker_hash=landmarker_fingerprint,
         )
 
     # -- one illuminant for the whole burst ------------------------------
@@ -370,14 +371,11 @@ def _analyze_session(sources, config: Config, model, landmarker) -> SessionResul
         )
 
     if session_config.shared_white_balance:
-        best = max(
-            range(len(corrections)),
-            key=lambda i: (
-                corrections[i].sclera_confidence
-                if corrections[i].sclera_confidence is not None
-                else -1.0
-            ),
-        )
+        def _confidence(index: int) -> float:
+            value = corrections[index].sclera_confidence
+            return float(value) if value is not None else -1.0
+
+        best = max(range(len(corrections)), key=_confidence)
         gains = corrections[best].gains
         corrected = [apply_gains(image, gains) for _, image, _, _, _ in kept]
     else:
@@ -469,7 +467,10 @@ def _analyze_session(sources, config: Config, model, landmarker) -> SessionResul
         composite=composite,
         spots=first_frame_spots,
         lesions=first_frame_lesions,
-        **fingerprints,
+        version=version,
+        config_hash=config_hash,
+        weights_hash=weights,
+        landmarker_hash=landmarker_fingerprint,
     )
 
 

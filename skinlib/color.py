@@ -154,7 +154,9 @@ def sclera_white_balance(
     count = int(len(pixels))
 
     if count < config.sclera_min_pixels:
-        reason = "eyes_closed_or_no_sclera" if count == 0 else f"only {count} sclera pixels"
+        reason: str | None = (
+            "eyes_closed_or_no_sclera" if count == 0 else f"only {count} sclera pixels"
+        )
         return (1.0, 1.0, 1.0), 0.0, count, reason
 
     gains = _normalise_gains(pixels.mean(axis=0), config.sclera_gain_clamp)

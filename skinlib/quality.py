@@ -178,11 +178,12 @@ def check_quality(
     laplacian = cv2.Laplacian(log_luminance(image), cv2.CV_64F)
     blur_metric = float(laplacian[skin_mask].var())
     measures["log_laplacian_variance"] = blur_metric
-    # Retained for inspection and for comparison with stored results, but no
-    # longer what the flag keys on.
-    measures["laplacian_variance"] = float(
-        cv2.Laplacian(grey, cv2.CV_64F)[skin_mask].var()
-    )
+    # Retained for inspection and for comparison with pre-9.0.0 stored results,
+    # but no longer what the flag keys on. See QualityConfig.compute_diagnostics.
+    if quality_config.compute_diagnostics:
+        measures["laplacian_variance"] = float(
+            cv2.Laplacian(grey, cv2.CV_64F)[skin_mask].var()
+        )
     if blur_metric < quality_config.blur_log_laplacian_var_min:
         flags.append(QualityFlag.BLURRY)
 
@@ -232,7 +233,8 @@ def check_quality(
     )
     measures["hf_energy"] = _finite(hf_energy)
     measures["scale_ratio"] = _finite(scale_ratio)
-    measures["texture_ratio"] = _finite(texture_ratio)
+    if quality_config.compute_diagnostics:
+        measures["texture_ratio"] = _finite(texture_ratio)
     # BOTH conditions, deliberately. Low high-frequency energy alone is also
     # what a soft lens, a distant subject or a dark exposure looks like. It is
     # the combination with a collapsed fine/coarse ratio — detail missing at

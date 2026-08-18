@@ -370,6 +370,7 @@ def _precompute(
     residual: np.ndarray | None = None,
     hemoglobin_residual_map: np.ndarray | None = None,
     chromophores: tuple[np.ndarray, np.ndarray] | None = None,
+    melanin: np.ndarray | None = None,
 ) -> dict[str, np.ndarray]:
     """Whole-image derived fields, computed once and shared by every region.
 
@@ -385,15 +386,11 @@ def _precompute(
     melanin_density, hemoglobin_density = (
         chromophores if chromophores is not None else separate_chromophores(image, config)
     )
-    return {
-        # None when the caller had no face or mask to build it from; the burden
-        # metrics then report NaN rather than a number from an absent map.
-        "residual": residual,
-        "hemoglobin_residual": hemoglobin_residual_map,
+    fields: dict[str, np.ndarray] = {
         "lightness": lightness,
         "a_star": a_star,
         "b_star": b_star,
-        "melanin": melanin_index_map(image, config),
+        "melanin": melanin if melanin is not None else melanin_index_map(image, config),
         "erythema_index": erythema_index_map(image, config),
         # Shading and exposure projected out analytically, not self-normalised.
         "melanin_density": melanin_density,
@@ -406,6 +403,15 @@ def _precompute(
             config.roughness_sigma_ratio,
         ),
     }
+    # The residual keys are ABSENT rather than None when the caller had no face
+    # or mask to build them from. Consumers reach them through `.get`, so a
+    # missing key reads as "not available" and the burden metrics report NaN —
+    # which keeps the dict honestly typed as arrays all the way down.
+    if residual is not None:
+        fields["residual"] = residual
+    if hemoglobin_residual_map is not None:
+        fields["hemoglobin_residual"] = hemoglobin_residual_map
+    return fields
 
 
 # Metrics whose regional value is self-normalised by subtracting the face-wide
@@ -461,6 +467,7 @@ def compute_metrics(
     melanin_residual_map: np.ndarray | None = None,
     hemoglobin_residual_map: np.ndarray | None = None,
     chromophores: tuple[np.ndarray, np.ndarray] | None = None,
+    melanin: np.ndarray | None = None,
 ) -> MetricsResult:
     """All metrics, globally and per region.
 
@@ -486,17 +493,18 @@ def compute_metrics(
     # scale the background kernel) and the skin mask. Without a face they stay
     # None and the metrics report NaN — not measured, rather than measured as
     # zero.
-    measurable = face is not None and skin_mask.any()
+    measurable = face is not None and bool(skin_mask.any())
     # All three are accepted precomputed. The chromophore separation and the
     # large-kernel medians behind the residuals are the library's two most
     # expensive operations, and the spot and lesion detectors need the very same
     # maps — so `analyze` builds each once and passes it to all three callers.
     residual = melanin_residual_map
-    if residual is None and measurable:
-        residual = melanin_residual(image, skin_mask, face, config)
     hemoglobin = hemoglobin_residual_map
-    if hemoglobin is None and measurable:
-        hemoglobin = hemoglobin_residual(image, skin_mask, face, config)
+    if face is not None and measurable:
+        if residual is None:
+            residual = melanin_residual(image, skin_mask, face, config)
+        if hemoglobin is None:
+            hemoglobin = hemoglobin_residual(image, skin_mask, face, config)
     fields = _precompute(
         image,
         metrics_config,
@@ -504,6 +512,7 @@ def compute_metrics(
         residual,
         hemoglobin,
         chromophores,
+        melanin,
     )
     unclipped = unclipped_mask(image, metrics_config)
     usable_skin = _valid_pixels(image, skin_mask, metrics_config, unclipped)

@@ -126,9 +126,10 @@ def load_image(source: str | Path | np.ndarray, config: IOConfig | None = None) 
         flags = cv2.IMREAD_COLOR
         if not config.apply_exif_orientation:
             flags |= cv2.IMREAD_IGNORE_ORIENTATION
-        image = cv2.imread(str(path), flags)
-        if image is None:
+        decoded = cv2.imread(str(path), flags)
+        if decoded is None:
             raise ImageLoadError(f"could not decode image: {path}")
+        image = decoded
 
     source_size = (image.shape[0], image.shape[1])
     long_edge = max(source_size)

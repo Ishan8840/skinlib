@@ -241,6 +241,7 @@ def analyze(
         melanin_residual_map=melanin_res,
         hemoglobin_residual_map=hemoglobin_res,
         chromophores=chromophores,
+        melanin=melanin_map,
     )
 
     return AnalysisResult(

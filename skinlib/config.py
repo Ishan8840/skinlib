@@ -285,6 +285,17 @@ class QualityConfig:
     side_lit_max_frac: float = 0.15
     # Face bbox area / frame area.
     face_area_frac_band: tuple[float, float] = (0.06, 0.55)
+    # Compute the extra diagnostic measures that no flag keys off: the LINEAR
+    # Laplacian variance (superseded by the log-domain one, retained so results
+    # stay comparable against pre-9.0.0 stored values) and `texture_ratio`
+    # (demoted from filter detection after measurement showed it ran backwards,
+    # retained so that finding can be re-checked).
+    #
+    # ~30ms per frame. On by default: this library keeps the evidence behind its
+    # negative results rather than deleting it, and 30ms is a cheap price for
+    # being able to reproduce a finding. Turn off in a throughput-bound service.
+    compute_diagnostics: bool = True
+
     # Variance of the Laplacian of LOG luminance, inside the skin mask.
     #
     # The log domain makes this brightness-invariant; an absolute threshold on

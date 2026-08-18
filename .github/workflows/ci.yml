@@ -53,7 +53,7 @@ jobs:
         run: ruff check skinlib tools
 
       - name: Types
-        run: mypy skinlib || true   # advisory until the numeric core is annotated through
+        run: mypy skinlib
 
       # -n 2, not `auto`. Each worker loads its own torch and BiSeNet, so
       # workers cost roughly 1GB apiece: `-n auto` on an 8-core machine OOM-kills
