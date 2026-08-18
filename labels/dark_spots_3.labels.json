@@ -1,0 +1,32 @@
+{
+ "image": "dark_spots_3.jpg",
+ "width": 640,
+ "height": 640,
+ "areas": [],
+ "marks": [
+  {
+   "x": 391,
+   "y": 352,
+   "r": 9,
+   "type": "mark"
+  },
+  {
+   "x": 544,
+   "y": 312,
+   "r": 9,
+   "type": "mark"
+  },
+  {
+   "x": 456,
+   "y": 553,
+   "r": 9,
+   "type": "mark"
+  },
+  {
+   "x": 401,
+   "y": 548,
+   "r": 9,
+   "type": "mark"
+  }
+ ]
+}
