@@ -12,6 +12,31 @@ from __future__ import annotations
 #   MAJOR  incompatible result shape (metric added/removed/renamed, region set changed)
 #   MINOR  output values can shift (threshold default, mask model, algorithm change)
 #   PATCH  provably value-preserving (docs, typing, refactor with byte-identical output)
+# 14.0.0 A learned lesion-density model, because the hand-tuned detector was
+#        measured and does not get there. External ground truth arrived first:
+#        ACNE04-v2 (Gazeau et al., MICCAI 2024) re-annotated the ICCV-2019
+#        ACNE04 faces with 32,443 dermatologist-drawn lesion circles. Against
+#        281 of those faces the classical pipeline scored per-lesion F1 0.11
+#        and named the worst region correctly 27% of the time — against F1
+#        0.40 on the dozen faces we had labelled ourselves, which is the
+#        measurement that mattered: our own labels were easier than the world.
+#        `tools/train_marks.py` fine-tunes the BiSeNet face-parsing ResNet18
+#        already in `models/` (face features, no new download, and no
+#        torchvision, which has no build matching the pinned torch) with a
+#        Poisson density head over a 32x32 grid on the face crop. 1,117 faces,
+#        893 train / 224 val, split stratified by severity level.
+#        Head to head on the same 222 held-out faces and the same anatomical
+#        regions:
+#                        rho    top-1   top-2
+#          model      +0.562      36%     64%
+#          classical  +0.203      20%     41%
+#        Top-1 is 1.8x the classical detector and rho is 2.8x, on faces the
+#        model never saw. It is not the 90% the product wants, and top-1 on
+#        eight regions is a harsh way to ask the question, but the direction is
+#        settled: this is a learning problem, not a threshold problem.
+#        Count MAE 14 lesions against a median true count of 19.
+#        ACNE04 is free for academic use only. This validates the pipeline; it
+#        does not license a shipped model trained on it.
 # 13.0.0 Regional detection density, aggregated across the burst, as the
 #        "which part of the face" answer: SessionResult.mark_density /
 #        .lesion_density and .worst_regions().
@@ -302,4 +327,4 @@ from __future__ import annotations
 #        measured noise floor of 0.13). Spot detection: MAD-based threshold,
 #        absolute minimum area, shape tests gated on area, whole-component
 #        boundary rejection. All of these shift stored values.
-PREPROCESSING_VERSION: str = "13.0.0"
+PREPROCESSING_VERSION: str = "14.0.0"
