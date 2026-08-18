@@ -113,7 +113,7 @@ def _chroma_residual_z(
     return residual, median, max(robust_sigma, 1e-9)
 
 
-def _threshold(inside: np.ndarray, config: SpotsConfig) -> float:
+def _threshold(inside: np.ndarray, config: SpotsConfig, floor: float = 0.0) -> float:
     """Residual level above which a pixel is a spot candidate.
 
     The MAD path measures spread about the median with a robust estimator, so
@@ -133,7 +133,13 @@ def _threshold(inside: np.ndarray, config: SpotsConfig) -> float:
         # A degenerate residual (a flat or posterised region) would otherwise
         # make every pixel a candidate.
         return float(config.threshold_absolute)
-    return float(median + config.threshold_mad * robust_sigma)
+    # A FLOOR under the relative threshold. Without one the bar scales with each
+    # face's own noise, so a quiet face gets a low bar and the detector fills it
+    # with whatever is locally unusual. Measured on two labelled faces: the
+    # mild one had half the robust sigma of the heavy one, so half the
+    # threshold, and its false positives sat at contrast 0.081 — well under the
+    # 0.093 the heavy face demanded. The floor makes "nothing here" reachable.
+    return max(float(median + config.threshold_mad * robust_sigma), float(floor))
 
 
 def local_residual(
@@ -227,6 +233,7 @@ def _components(
     extra_reject=None,
     face: Face | None = None,
     millimetres: float | None = None,
+    floor: float = 0.0,
 ) -> list[tuple]:
     """Threshold a residual, componentise it, and apply the shape/position filters.
 
@@ -241,7 +248,7 @@ def _components(
     if not skin_mask.any():
         return []
 
-    threshold = _threshold(residual[skin_mask], spots_config)
+    threshold = _threshold(residual[skin_mask], spots_config, floor)
     candidates = skin_mask & (residual > threshold)
     if not candidates.any():
         return []
@@ -359,7 +366,8 @@ def detect_lesions(
         )
         for centroid, bbox, area, area_fraction, intensity, contrast, eccentricity, region
         in _components(residual, hemoglobin, skin_mask, config.spots, regions, face=face,
-                       millimetres=config.spots.min_lesion_mm)
+                       millimetres=config.spots.min_lesion_mm,
+                       floor=config.spots.lesion_threshold_floor)
     ]
 
     # Fully specified ordering, as for spots: area alone leaves ties, and tied
@@ -423,7 +431,8 @@ def detect_spots(
             region=region,
         )
         for centroid, bbox, area, area_fraction, intensity, contrast, eccentricity, region
-        in _components(residual, melanin, skin_mask, spots_config, regions, reject, face=face)
+        in _components(residual, melanin, skin_mask, spots_config, regions, reject, face=face,
+                       floor=spots_config.mark_threshold_floor)
     ]
 
     # Fully specified ordering. Area alone leaves ties, and tied records would

@@ -12,6 +12,29 @@ from __future__ import annotations
 #   MAJOR  incompatible result shape (metric added/removed/renamed, region set changed)
 #   MINOR  output values can shift (threshold default, mask model, algorithm change)
 #   PATCH  provably value-preserving (docs, typing, refactor with byte-identical output)
+# 12.0.0 An absolute FLOOR under the MAD threshold, because the relative bar
+#        scaled with each face's own noise: a quiet face got a low bar and the
+#        detector filled it with whatever was locally unusual. Measured on two
+#        labelled faces, the milder had HALF the robust sigma of the heavy one
+#        and so half the threshold, admitting features at contrast 0.081 that
+#        the heavy face would never have accepted. The lesion detector
+#        therefore only worked when there was a lot to find.
+#          floor   pooled F1     heavy P/R     mild P/R
+#          0.00       0.37       0.46/0.43    0.11/0.08
+#          0.07       0.42       0.46/0.43    0.36/0.33
+#          0.09       0.42       0.46/0.43    0.50/0.25   <- chosen
+#          0.11       0.32       0.34/0.27    0.75/0.25
+#        0.09 is the MIDDLE of a flat 0.07-0.10 plateau rather than the best
+#        single score, because a narrow optimum on two faces would not survive
+#        a third.
+#        The same floor is measured NOT to help marks and is left at 0.0 there:
+#        across 53 marks on five faces it buys precision (0.44 -> 0.70) and
+#        pays far more in recall (0.43 -> 0.13). Physically consistent — a
+#        pigmented mark is low-contrast by nature, an inflammatory lesion is
+#        high-contrast red, so an absolute bar removes real marks and only
+#        noise-level lesions.
+#        min_lesion_mm = 2.0 also re-confirmed on the second labelled face.
+#        MAJOR: lesion counts change.
 # 11.0.0 Ground truth, at last: 49 hand-labelled marks across FIVE faces and
 #        37 labelled lesions, against the 6 marks on one face that set 10.0.0.
 #        Two findings.
@@ -260,4 +283,4 @@ from __future__ import annotations
 #        measured noise floor of 0.13). Spot detection: MAD-based threshold,
 #        absolute minimum area, shape tests gated on area, whole-component
 #        boundary rejection. All of these shift stored values.
-PREPROCESSING_VERSION: str = "11.0.0"
+PREPROCESSING_VERSION: str = "12.0.0"

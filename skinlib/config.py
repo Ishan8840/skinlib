@@ -698,6 +698,37 @@ class SpotsConfig:
     # Weaker evidence than the mark threshold, which is pooled over 49 marks on
     # five faces: this is 37 lesions on ONE. Re-check on a second face.
     min_lesion_mm: float = 2.0
+
+    # -- absolute floors under the MAD threshold, in each residual's own units --
+    #
+    # The MAD threshold scales with each face's own noise, so a quiet face gets
+    # a low bar and the detector fills it with whatever is locally unusual.
+    # Measured on two labelled faces, the milder one had HALF the robust sigma
+    # of the heavy one and therefore half the threshold, admitting features at
+    # contrast 0.081 that the heavy face would never have accepted. A floor
+    # makes "there is nothing here" a reachable answer.
+    #
+    # LESIONS: floor helps a great deal. Scored on 49 labelled lesions across
+    # two faces, with the heavy face unaffected throughout:
+    #   floor   pooled F1     heavy P/R     mild P/R
+    #   0.00       0.37       0.46/0.43    0.11/0.08   <- detector only worked
+    #   0.07       0.42       0.46/0.43    0.36/0.33      when there was a lot
+    #   0.09       0.42       0.46/0.43    0.50/0.25      to find
+    #   0.11       0.32       0.34/0.27    0.75/0.25
+    # 0.09 is the middle of a flat 0.07-0.10 plateau, chosen over an edge value
+    # because a narrow optimum on two faces would not survive a third.
+    lesion_threshold_floor: float = 0.09
+    #
+    # MARKS: floor measured NOT to help, and it is left off. Across 53 labelled
+    # marks on five faces it buys precision and pays far more in recall:
+    #   floor  prec  rec    F1
+    #   0.00   0.44  0.43  0.44   <- best
+    #   0.05   0.52  0.32  0.40
+    #   0.07   0.70  0.13  0.22
+    # Physically consistent: a pigmented mark is a low-contrast feature by
+    # nature, so an absolute contrast bar removes real ones. An inflammatory
+    # lesion is high-contrast red, so the same bar removes only noise.
+    mark_threshold_floor: float = 0.0
     # Face width used to convert millimetres to pixels. An adult face is
     # 135-150mm bizygomatic; 140 is the middle and the error from using a
     # constant is far smaller than the error from using pixels.
