@@ -21,7 +21,7 @@ import cv2
 import numpy as np
 
 from . import landmarks as lm
-from .config import Config, RegionConfig
+from .config import Config
 from .types import REGION_NAMES, Face
 
 __all__ = ["build_region_polygons", "build_regions"]

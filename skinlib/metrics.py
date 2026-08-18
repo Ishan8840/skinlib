@@ -278,8 +278,14 @@ def region_metrics(
     """Every metric for one mask.
 
     ``spots`` are those already assigned to this mask; ``spot_reference_area``
-    is the pixel count the area fraction is taken against (the mask's own area
-    unless the caller overrides it). ``reference`` carries the face-wide
+    is the pixel count the area fraction is taken against.
+
+    That reference must be the RAW mask area, not the unclipped count. Spot
+    components are found on the raw skin mask, so their pixels include any that
+    the clipping filter would drop; dividing that numerator by an unclipped
+    denominator mixes two different pixel populations and biases the fraction
+    upward exactly where the capture is worst. Small in magnitude, but this is a
+    column a longitudinal tracker reads. ``reference`` carries the face-wide
     medians the ``_rel`` variants are measured against; without it those come
     back NaN, because a relative metric with no reference is not a number.
 
@@ -514,15 +520,17 @@ def compute_metrics(
             values["spot_area_fraction"] = float("nan")
         return values
 
-    global_metrics = metrics_for(skin_mask, spots, skin_area)
+    # Raw mask area, matching the population the spot detector ran on.
+    global_metrics = metrics_for(skin_mask, spots, int(skin_mask.sum()))
 
     by_region: dict[str, dict[str, float]] = {}
     pixel_counts: dict[str, int] = {"global": skin_area}
     for name, mask in regions.items():
-        area = int(_valid_pixels(image, mask, metrics_config, unclipped).sum())
-        pixel_counts[name] = area
+        # pixel_counts reports what was MEASURED (unclipped); the spot fraction
+        # is referenced to the raw mask, which is what spots were found on.
+        pixel_counts[name] = int(_valid_pixels(image, mask, metrics_config, unclipped).sum())
         own = None if spots is None else [spot for spot in spots if spot.region == name]
-        by_region[name] = metrics_for(mask, own, area)
+        by_region[name] = metrics_for(mask, own, int(mask.sum()))
 
     # D(x, y) = M(x, y) - median(M over the face).
     #

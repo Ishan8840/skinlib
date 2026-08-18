@@ -12,6 +12,41 @@ from __future__ import annotations
 #   MAJOR  incompatible result shape (metric added/removed/renamed, region set changed)
 #   MINOR  output values can shift (threshold default, mask model, algorithm change)
 #   PATCH  provably value-preserving (docs, typing, refactor with byte-identical output)
+# 9.0.0  Completes the sweep for absolute thresholds on brightness-dependent
+#        quantities — the defect pattern behind `too_dark` (8.0.0) and
+#        `blurry`. Every remaining QualityConfig threshold was measured against
+#        one unchanged photo scaled toward deeper tones:
+#          specular_fraction  0.00628 -> 0.00000   BROKEN, fixed below
+#          hf_energy                     1.10x     acceptable
+#          side_lit_ratio                1.08x     tone-independent
+#          scale_ratio / texture_ratio   1.01x     clean
+#        So `side_lit` firing on 12/12 of the baseline captures is NOT a
+#        fairness defect; that lighting is genuinely directional.
+#        Specular detection was the worst of the three: `V >= 0.92` did not
+#        shift on darker skin, it stopped working entirely, because the
+#        brightest channel never reaches 0.92 once median V is 0.59. Shine was
+#        undetectable on anything but light skin. Now `V > 1.25 * median(V over
+#        skin)`, since a highlight is bright RELATIVE to the diffuse level
+#        around it; 1.25 reproduces the old measure on the unchanged image
+#        (0.00688 vs 0.00628) and holds within 1.46x across the range.
+#        `specular_v_min` drops to 0.15, a backstop against quantisation noise.
+#        Verified: 0 of 56 real captures flagged high_specular.
+#        `too_bright` gets the fix `too_dark` got in 8.0.0. The argument was
+#        never one-sided: mean L* rises with skin LIGHTNESS as much as with
+#        exposure, so the L* > 82 ceiling was wrong in both directions at once.
+#        It would reject correctly exposed very light skin (ITA > 55 reaches
+#        L* 84.6 at b* = 20) while staying silent on a capture measured with
+#        17% of the skin already blown out. Now keys on
+#        `highlight_clipped_fraction` > 0.02, mirroring `shadow_clipped_max`
+#        and ~5x above the worst observed good capture (0.00406, `flash` set).
+#        `luminance_band` becomes (12.0, 95.0), both bounds backstops only.
+#        Verified: 0 of 56 real captures newly flagged.
+#        `spot_area_fraction` divided two different pixel populations — the
+#        numerator summed components found on the RAW skin mask, the
+#        denominator excluded clipped pixels, biasing the fraction upward
+#        exactly where the capture is worst. Both are now the raw mask.
+#        `pixel_counts` still reports what was measured (unclipped).
+#        MAJOR: flag semantics changed, spot_area_fraction values shift.
 # 8.0.0  `too_dark` now fires on INFORMATION LOSS rather than on darkness.
 #        The old gate thresholded mean skin L* at 32.0, which rejected
 #        correctly exposed deep skin by construction. Inverting the ITA scale
@@ -165,4 +200,4 @@ from __future__ import annotations
 #        measured noise floor of 0.13). Spot detection: MAD-based threshold,
 #        absolute minimum area, shape tests gated on area, whole-component
 #        boundary rejection. All of these shift stored values.
-PREPROCESSING_VERSION: str = "8.0.0"
+PREPROCESSING_VERSION: str = "9.0.0"

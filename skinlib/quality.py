@@ -129,12 +129,22 @@ def check_quality(
     # The absolute floor survives only as a backstop for a frame with no signal
     # at all. It sits far below any real skin tone, so it cannot fire on
     # pigmentation.
+    # Both tails, symmetrically. 8.0.0 fixed only `too_dark`, but the argument
+    # was never one-sided: mean L* rises with skin lightness as much as with
+    # exposure, so an absolute ceiling rejects very light skin the same way the
+    # floor rejected very deep skin. Measured, the old L* > 82 bar was wrong in
+    # BOTH directions at once — it would reject correctly exposed ITA > 55 skin
+    # (L* 84.6 at b* = 20) while staying silent on a capture with 17% of the
+    # skin already blown out.
     if (
         measures["shadow_clipped_fraction"] > quality_config.shadow_clipped_max
         or mean_lightness < dark_limit
     ):
         flags.append(QualityFlag.TOO_DARK)
-    elif mean_lightness > bright_limit:
+    elif (
+        measures["highlight_clipped_fraction"] > quality_config.highlight_clipped_max
+        or mean_lightness > bright_limit
+    ):
         flags.append(QualityFlag.TOO_BRIGHT)
 
     # -- directional lighting --
@@ -177,12 +187,38 @@ def check_quality(
         flags.append(QualityFlag.BLURRY)
 
     # -- specular highlights --
+    #
+    # A highlight is bright RELATIVE to the diffuse skin around it, not in
+    # absolute terms: it is light reflected off the surface before entering the
+    # skin, so it carries the illuminant's colour (hence desaturated) and stands
+    # well above the local diffuse level. On deep skin that level is low, so the
+    # highlight is dimmer in absolute terms while being just as much of a
+    # highlight.
+    #
+    # The old absolute bar (V >= 0.92) did not merely shift on darker skin, it
+    # STOPPED WORKING. Measured on one unchanged photo scaled toward deeper
+    # tones, the specular fraction went 0.00628 -> exactly 0.00000 and stayed
+    # there: the brightest channel never reaches 0.92 once median V is 0.59, so
+    # shine was undetectable on anything but light skin.
+    #
+    # Referenced to the skin's own median V, the same photo holds 0.00688 ->
+    # 0.00471 across the same range, and 1.25x reproduces the old measure's
+    # value on the unchanged image (0.00688 against 0.00628).
     hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
     value = hsv[:, :, 2].astype(np.float64) / 255.0
     saturation = hsv[:, :, 1].astype(np.float64) / 255.0
+
+    median_value = float(np.median(value[skin_mask])) if skin_mask.any() else 0.0
+    measures["median_value"] = median_value
+    # The absolute floor survives only to stop a near-black region manufacturing
+    # "highlights" out of quantisation noise; it sits below any real skin.
+    specular_level = max(
+        quality_config.specular_v_ratio * median_value, quality_config.specular_v_min
+    )
+    measures["specular_level"] = specular_level
     specular = (
         skin_mask
-        & (value >= quality_config.specular_v_min)
+        & (value > specular_level)
         & (saturation <= quality_config.specular_s_max)
     )
     specular_fraction = float(specular.sum() / skin_pixels)

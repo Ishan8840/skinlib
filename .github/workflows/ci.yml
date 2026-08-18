@@ -1,0 +1,58 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"   # MediaPipe has no wheels for 3.14
+
+      # The two checkpoints are ~57MB and are not in the repository, by design:
+      # a model downloaded at analysis time could silently swap between two
+      # sessions of a longitudinal series, which is the one failure this
+      # library exists to prevent. Cached on their URLs so CI fetches them once.
+      - name: Cache model assets
+        id: models
+        uses: actions/cache@v4
+        with:
+          path: models
+          key: skinlib-models-bisenet79999-facelandmarker-float16-v1
+
+      - name: Fetch model assets
+        if: steps.models.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p models
+          curl -sSL -o models/bisenet_79999_iter.pth \
+            https://huggingface.co/ManyOtherFunctions/face-parse-bisent/resolve/main/79999_iter.pth
+          curl -sSL -o models/face_landmarker.task \
+            https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task
+
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          pip install torch --index-url https://download.pytorch.org/whl/cpu
+          pip install -e ".[dev]"
+
+      - name: Lint
+        run: ruff check skinlib tools
+
+      - name: Types
+        run: mypy skinlib || true   # advisory until the numeric core is annotated through
+
+      # -n 2, not `auto`. Each worker loads its own torch and BiSeNet, so
+      # workers cost roughly 1GB apiece: `-n auto` on an 8-core machine OOM-kills
+      # (observed, exit 137). Two workers is the useful part of the win without
+      # the risk. Asset-gated tests skip cleanly if a checkpoint is missing, so a
+      # cache miss degrades to a partial run rather than a red build.
+      - name: Tests
+        env:
+          SKINLIB_BISENET_WEIGHTS: models/bisenet_79999_iter.pth
+          SKINLIB_FACE_LANDMARKER: models/face_landmarker.task
+        run: pytest tests/ -q -n 2

@@ -19,7 +19,8 @@ import hashlib
 import json
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Any, Iterable, Literal, Mapping
+from typing import Any, Literal
+from collections.abc import Iterable, Mapping
 
 # --------------------------------------------------------------------------
 # stages
@@ -248,13 +249,18 @@ class QualityConfig:
 
     # Mean L* (0..100) inside the skin mask.
     #
-    # The lower bound is a BACKSTOP ONLY — it catches a frame with no signal at
-    # all, and must stay far below any real skin tone. It was 32.0, which
-    # rejected correctly exposed deep skin: inverting the ITA scale, mean L* of
-    # 32 corresponds to ITA -42 to -56 depending on b*, well inside the "dark"
-    # class that `monk_ita_edges` claims to classify. `too_dark` now fires on
-    # shadow clipping instead; see quality.py.
-    luminance_band: tuple[float, float] = (12.0, 82.0)
+    # BOTH bounds are BACKSTOPS ONLY — they catch a frame with no signal at
+    # either end, and both must sit outside any real skin tone. Neither is the
+    # exposure test any more; `too_dark` and `too_bright` fire on clipping.
+    #
+    # The lower bound was 32.0, which rejected correctly exposed deep skin:
+    # inverting the ITA scale, mean L* of 32 is ITA -42 to -56 depending on b*,
+    # well inside the "dark" class `monk_ita_edges` claims to classify.
+    #
+    # The upper bound was 82.0, which is the same error mirrored: ITA > 55 skin
+    # reaches L* 84.6 at b* = 20, so the ceiling rejected the lightest skin
+    # exactly as the floor rejected the deepest. See quality.py.
+    luminance_band: tuple[float, float] = (12.0, 95.0)
 
     # Fraction of skin pixels crushed against black before a capture counts as
     # underexposed. THIS is the real `too_dark` test, and it is tone-independent:
@@ -264,6 +270,17 @@ class QualityConfig:
     # `distance` set; every other set measured below 0.0001) and does catch the
     # genuinely dark clinical image observed at 0.027.
     shadow_clipped_max: float = 0.02
+
+    # The same test at the other end, and for the same reason. Mean L* rises
+    # with skin lightness as well as with exposure, so the old `too_bright` bar
+    # at L* > 82 was wrong in both directions at once: it would reject correctly
+    # exposed very light skin (ITA > 55 reaches L* 84.6 at b* = 20) while
+    # staying silent on a capture measured with 17% of the skin already blown.
+    #
+    # 0.02 mirrors `shadow_clipped_max` and sits ~5x above the worst observed
+    # good capture (0.00406, from the `flash` set, where a bright on-axis source
+    # legitimately puts a little of the skin at the ceiling).
+    highlight_clipped_max: float = 0.02
     # |L_left - L_right| / mean(L) above this -> side_lit.
     side_lit_max_frac: float = 0.15
     # Face bbox area / frame area.
@@ -283,8 +300,21 @@ class QualityConfig:
     blur_laplacian_var_min: float = 55.0
     # Source long edge below this -> low_resolution (and no upscale happens).
     min_long_edge_px: int = 900
-    # Specular pixel: HSV V >= v_min and S <= s_max (both normalised 0..1).
-    specular_v_min: float = 0.92
+    # Specular pixel: HSV V above `specular_v_ratio * median(V over skin)`, and
+    # S <= s_max. Both normalised 0..1.
+    #
+    # RELATIVE to the skin's own brightness, because a highlight is bright
+    # relative to the diffuse level around it. The old absolute bar of 0.92 did
+    # not shift on darker skin, it stopped working: the specular fraction went
+    # 0.00628 -> exactly 0.00000 as one unchanged photo was scaled toward deeper
+    # tones, so shine was undetectable on anything but light skin.
+    #
+    # 1.25 reproduces the old measure on the unchanged image (0.00688 against
+    # 0.00628) and holds within 1.46x across the same brightness range.
+    specular_v_ratio: float = 1.25
+    # Absolute floor, a backstop only: it stops a near-black region inventing
+    # highlights from quantisation noise. Far below any real skin tone.
+    specular_v_min: float = 0.15
     specular_s_max: float = 0.18
     specular_frac_max: float = 0.05
 

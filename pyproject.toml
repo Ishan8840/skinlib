@@ -20,10 +20,33 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=7.4"]
+dev = ["pytest>=7.4", "pytest-xdist>=3.5", "ruff>=0.6", "mypy>=1.11"]
+
+[project.scripts]
+skinlib-evaluate = "tools.evaluate:main"
+skinlib-repeatability = "tools.repeatability:main"
+skinlib-tone-audit = "tools.tone_audit:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["skinlib"]
+
+[tool.ruff]
+line-length = 96
+target-version = "py311"
+
+[tool.ruff.lint]
+# Deliberately not enabling import sorting as an error: this package orders
+# some imports for circularity reasons that a sorter would silently undo.
+select = ["E", "F", "W", "B", "UP"]
+ignore = ["E501"]
+
+[tool.mypy]
+python_version = "3.11"
+warn_unused_ignores = true
+# The numeric core passes arrays through cv2 and scipy, neither of which ships
+# useful stubs. Typing the library's own surface is the point; chasing those is
+# not.
+ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

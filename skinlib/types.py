@@ -375,7 +375,7 @@ class SessionResult:
     def comparable_key(self) -> tuple[str, str, str, str]:
         return (self.version, self.config_hash, self.weights_hash, self.landmarker_hash)
 
-    def trusted_change(self, metric: str, other: "SessionResult") -> bool:
+    def trusted_change(self, metric: str, other: SessionResult) -> bool:
         """Is the difference in ``metric`` between two sessions real?
 
         The question every longitudinal tracker actually needs answered, and the

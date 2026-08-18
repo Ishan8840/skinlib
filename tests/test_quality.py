@@ -129,6 +129,73 @@ def test_genuine_blur_is_still_caught(analysed, full_config: Config) -> None:
     assert result.has(QualityFlag.BLURRY)
 
 
+def test_specular_detection_survives_darker_skin(analysed, full_config: Config) -> None:
+    """The third flag with the same defect — and the worst of them.
+
+    `V >= 0.92` did not merely shift on darker skin, it STOPPED WORKING: the
+    specular fraction measured 0.00628 -> exactly 0.00000 as one unchanged photo
+    was scaled toward deeper tones, because the brightest channel never reaches
+    0.92 once median V is 0.59. Shine was undetectable on anything but light
+    skin.
+
+    A highlight is bright RELATIVE to the diffuse level around it, so the
+    threshold is now a multiple of the skin's own median V.
+    """
+    loaded, face, skin, regions = analysed
+    fractions = []
+    for scale in (1.0, 0.6, 0.35, 0.25):
+        darker = np.clip(
+            loaded.image.astype(np.float64) * scale + 8.0, 0, 255
+        ).astype(np.uint8)
+        result = check_quality(
+            load_image(darker, IOConfig(max_long_edge_px=None)),
+            face, skin, regions, full_config,
+        )
+        fractions.append(result.measures["specular_fraction"])
+
+    assert all(f > 0.0 for f in fractions), (
+        f"specular detection died on darker skin: {fractions}"
+    )
+    # Measured 0.00688 -> 0.00471 across this range; 2x is a generous bound.
+    assert max(fractions) / min(fractions) < 2.0
+
+
+def test_blown_highlights_flag_too_bright(analysed, full_config: Config) -> None:
+    """The other tail of the same argument, which 8.0.0 left unfixed.
+
+    The old bar was mean L* > 82, which measured wrong in BOTH directions at
+    once: it would reject correctly exposed very light skin (ITA > 55 reaches
+    L* 84.6 at b* = 20) while staying silent on a capture with 17% of the skin
+    already at the ceiling.
+    """
+    loaded, face, skin, regions = analysed
+    blown = np.clip(loaded.image.astype(np.int32) + 40, 0, 255).astype(np.uint8)
+    result = check_quality(
+        load_image(blown, IOConfig(max_long_edge_px=None)), face, skin, regions, full_config
+    )
+    assert result.measures["highlight_clipped_fraction"] > full_config.quality.highlight_clipped_max
+    assert result.has(QualityFlag.TOO_BRIGHT)
+
+
+def test_light_skin_is_not_overexposure(analysed, full_config: Config) -> None:
+    """A light face with nothing clipped is a lighter person, not a worse photo."""
+    loaded, face, skin, regions = analysed
+    # Range-compressed and lifted so mean L* clears the old 82.0 ceiling while
+    # NOTHING reaches the clip point. L* is strongly non-linear in sRGB, so a
+    # plain scale-and-offset overshoots the ceiling long before it lifts the
+    # mean; measured, this lands at L* 86.6 with highlight clipping at exactly
+    # zero.
+    lighter = np.clip(
+        loaded.image.astype(np.float64) * 0.25 + 185.0, 0, 255
+    ).astype(np.uint8)
+    result = check_quality(
+        load_image(lighter, IOConfig(max_long_edge_px=None)), face, skin, regions, full_config
+    )
+    assert result.measures["mean_lightness"] > 82.0, "should exceed the OLD threshold"
+    assert result.measures["highlight_clipped_fraction"] <= full_config.quality.highlight_clipped_max
+    assert not result.has(QualityFlag.TOO_BRIGHT)
+
+
 def test_crushed_shadows_flag_too_dark(analysed, full_config: Config) -> None:
     """`too_dark` means information was destroyed, not that skin is dark.
 

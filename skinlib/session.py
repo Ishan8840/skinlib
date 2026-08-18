@@ -265,12 +265,11 @@ def analyze_session(
     another session would have to show before it means anything.
     """
     config = config or Config()
-    session_config = config.session
     model = parser if parser is not None else load_parser(config)
     # One landmarker for the whole burst. Building one costs ~182ms against
     # ~24ms to detect, so a ten-frame burst that rebuilt per frame spent ~1.8s
-    # on construction alone. Closed in the finally below when we built it;
-    # a caller-supplied one is the caller's to close.
+    # on construction alone. The ExitStack closes it only when WE built it;
+    # a caller-supplied one stays the caller's to close.
     with ExitStack() as stack:
         if landmarker is None:
             landmarker = stack.enter_context(load_landmarker(config))
