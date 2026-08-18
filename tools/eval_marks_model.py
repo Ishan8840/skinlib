@@ -20,7 +20,19 @@ import numpy as np
 import torch
 
 from skinlib import Config, analyze, load_landmarker, load_parser
+
 from tools.train_marks import DensityNet, spearman_rows, to_tensor
+
+# The product does not say "glabella". It says "your forehead" or "your left
+# cheek", so the coarse grouping is the reading a user is actually shown, and
+# the nine-region score is the stricter internal one.
+ZONES: dict[str, tuple[str, ...]] = {
+    "forehead": ("forehead", "glabella"),
+    "left_cheek": ("left_cheek", "periorbital_left"),
+    "right_cheek": ("right_cheek", "periorbital_right"),
+    "nose": ("nose",),
+    "mouth_chin": ("perioral", "chin"),
+}
 
 
 def val_indices(names: np.ndarray, val_frac: float, seed: int) -> np.ndarray:
@@ -68,6 +80,7 @@ def main() -> None:
 
     rhos_m, rhos_c = [], []
     t1m = t2m = t1c = t2c = scored = 0
+    z1m = z2m = z1c = z2c = zscored = 0
     with load_landmarker(config) as lm, torch.no_grad():
         for k, j in enumerate(va):
             name = str(names[j])
@@ -148,6 +161,26 @@ def main() -> None:
             t1c += worst == oc[0]
             t2c += worst in oc
             scored += 1
+
+            index = {n: i for i, (n, _) in enumerate(regions)}
+            zt, zm, zc = [], [], []
+            for members in ZONES.values():
+                cols = [index[n] for n in members if n in index]
+                if not cols:
+                    continue
+                zt.append(truth_v[0, cols].mean())
+                zm.append(model_v[0, cols].mean())
+                zc.append(cls_v[0, cols].mean())
+            if len(zt) >= 4 and sum(zt) > 0:
+                zt_a = np.array(zt)
+                worst_z = int(np.argmax(zt_a))
+                zom = np.argsort(-np.array(zm))[:2]
+                zoc = np.argsort(-np.array(zc))[:2]
+                z1m += worst_z == zom[0]
+                z2m += worst_z in zom
+                z1c += worst_z == zoc[0]
+                z2c += worst_z in zoc
+                zscored += 1
             if k % 25 == 0:
                 print(f"  {k}/{len(va)}", flush=True)
 
@@ -155,6 +188,11 @@ def main() -> None:
     print(f"{'':10s} {'rho':>8s} {'top-1':>8s} {'top-2':>8s}")
     print(f"{'model':10s} {np.mean(rhos_m):+8.3f} {t1m / scored:8.0%} {t2m / scored:8.0%}")
     print(f"{'classical':10s} {np.mean(rhos_c):+8.3f} {t1c / scored:8.0%} {t2c / scored:8.0%}")
+    if zscored:
+        print(f"\n{zscored} faces scored on the five coarse zones a user is shown\n")
+        print(f"{'':10s} {'top-1':>8s} {'top-2':>8s}")
+        print(f"{'model':10s} {z1m / zscored:8.0%} {z2m / zscored:8.0%}")
+        print(f"{'classical':10s} {z1c / zscored:8.0%} {z2c / zscored:8.0%}")
 
 
 if __name__ == "__main__":

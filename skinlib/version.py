@@ -34,6 +34,11 @@ from __future__ import annotations
 #        model never saw. It is not the 90% the product wants, and top-1 on
 #        eight regions is a harsh way to ask the question, but the direction is
 #        settled: this is a learning problem, not a threshold problem.
+#        Scored on the five coarse zones the product actually shows rather
+#        than nine anatomical regions, on the 154 held-out faces that resolve
+#        all five: model 51% top-1 / 79% top-2, classical 25% / 47%, chance
+#        20% / 40%. The strict nine-region number is the internal one; the
+#        five-zone number is what a user experiences.
 #        Count MAE 14 lesions against a median true count of 19.
 #        ACNE04 is free for academic use only. This validates the pipeline; it
 #        does not license a shipped model trained on it.

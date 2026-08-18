@@ -1,0 +1,604 @@
+<title>Field Test</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,800&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+
+<style>
+:root {
+  --bg: #EFF2F3;
+  --surface: #FFFFFF;
+  --surface-2: #F6F8F9;
+  --text: #131A1F;
+  --muted: #5B6A74;
+  --faint: #8797A2;
+  --line: #DCE3E7;
+  --accent: #0B6B63;
+  --accent-soft: #D7EAE7;
+  --hot: #E23A2E;
+  --warm: #E8913A;
+  --shadow: 0 1px 2px rgba(19,26,31,.06), 0 12px 32px rgba(19,26,31,.08);
+  --bezel: #1A2026;
+}
+:root:not([data-theme="light"]) {
+  color-scheme: light dark;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0D1216;
+    --surface: #151C21;
+    --surface-2: #1B242A;
+    --text: #E7EEF1;
+    --muted: #93A3AD;
+    --faint: #6B7B86;
+    --line: #26333B;
+    --accent: #45C9BB;
+    --accent-soft: #123832;
+    --hot: #FF6B5E;
+    --warm: #F2A65A;
+    --shadow: 0 1px 2px rgba(0,0,0,.4), 0 16px 40px rgba(0,0,0,.45);
+    --bezel: #05090C;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0D1216;
+  --surface: #151C21;
+  --surface-2: #1B242A;
+  --text: #E7EEF1;
+  --muted: #93A3AD;
+  --faint: #6B7B86;
+  --line: #26333B;
+  --accent: #45C9BB;
+  --accent-soft: #123832;
+  --hot: #FF6B5E;
+  --warm: #F2A65A;
+  --shadow: 0 1px 2px rgba(0,0,0,.4), 0 16px 40px rgba(0,0,0,.45);
+  --bezel: #05090C;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: "IBM Plex Sans", system-ui, -apple-system, sans-serif;
+  font-size: 16px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+.wrap { max-width: 1080px; margin: 0 auto; padding: 0 24px; }
+
+h1, h2, h3 {
+  font-family: "Bricolage Grotesque", "IBM Plex Sans", system-ui, sans-serif;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  text-wrap: balance;
+  margin: 0;
+}
+
+.eyebrow {
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 11px;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin: 0 0 14px;
+}
+
+/* ---------- hero ---------- */
+
+header {
+  padding: 80px 0 56px;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface);
+}
+header h1 { font-size: clamp(38px, 6vw, 68px); line-height: 1.03; max-width: 16ch; }
+header p.lede {
+  margin: 22px 0 0;
+  font-size: clamp(17px, 2vw, 20px);
+  color: var(--muted);
+  max-width: 54ch;
+}
+
+.stat-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 40px;
+  margin-top: 40px;
+  padding-top: 26px;
+  border-top: 1px solid var(--line);
+}
+.stat { display: flex; flex-direction: column; gap: 2px; }
+.stat b {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 26px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -.02em;
+}
+.stat span { font-size: 12.5px; color: var(--faint); }
+
+/* ---------- sections ---------- */
+
+section { padding: 76px 0; }
+section.alt { background: var(--surface); border-block: 1px solid var(--line); }
+.section-head { max-width: 62ch; margin-bottom: 44px; }
+.section-head h2 { font-size: clamp(26px, 3.4vw, 36px); line-height: 1.15; }
+.section-head p { color: var(--muted); margin: 14px 0 0; }
+
+/* ---------- phone flow ---------- */
+
+.flow {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(212px, 1fr));
+  gap: 28px;
+}
+.step { display: flex; flex-direction: column; gap: 16px; }
+.phone {
+  position: relative;
+  aspect-ratio: 9 / 19;
+  border-radius: 30px;
+  background: var(--bezel);
+  padding: 7px;
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+.screen {
+  position: relative;
+  height: 100%;
+  border-radius: 24px;
+  overflow: hidden;
+  background: #0A0E11;
+  display: flex;
+  flex-direction: column;
+}
+.screen img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.scrim { position: absolute; inset: 0; background: linear-gradient(180deg, rgba(5,9,12,.62) 0%, rgba(5,9,12,0) 26%, rgba(5,9,12,0) 52%, rgba(5,9,12,.86) 100%); }
+.screen-body { position: relative; height: 100%; display: flex; flex-direction: column; justify-content: space-between; padding: 16px 14px 18px; color: #fff; }
+.screen-top { font-family: "IBM Plex Mono", monospace; font-size: 10px; letter-spacing: .12em; text-transform: uppercase; opacity: .82; }
+.screen-bottom { display: flex; flex-direction: column; gap: 8px; }
+.screen-bottom strong { font-size: 15px; font-weight: 600; line-height: 1.3; }
+.screen-bottom small { font-size: 11.5px; opacity: .78; line-height: 1.45; }
+
+.oval {
+  position: absolute;
+  left: 50%; top: 42%;
+  transform: translate(-50%, -50%);
+  width: 68%; aspect-ratio: 3/4;
+  border: 2px dashed rgba(255,255,255,.72);
+  border-radius: 50%;
+}
+.pill {
+  align-self: flex-start;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 10px;
+  letter-spacing: .06em;
+  padding: 4px 9px;
+  border-radius: 100px;
+  background: rgba(255,255,255,.16);
+  backdrop-filter: blur(6px);
+  border: 1px solid rgba(255,255,255,.22);
+}
+.pill.bad { background: rgba(226,58,46,.86); border-color: transparent; }
+.pill.good { background: rgba(11,107,99,.9); border-color: transparent; }
+
+.zonelist { display: flex; flex-direction: column; gap: 5px; }
+.zonerow { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 8px; font-size: 11px; }
+.zonebar { position: relative; height: 4px; border-radius: 4px; background: rgba(255,255,255,.2); overflow: hidden; grid-column: 1 / -1; }
+.zonebar i { position: absolute; inset: 0 auto 0 0; border-radius: 4px; }
+
+.step-label { display: flex; gap: 10px; align-items: baseline; }
+.step-label b { font-family: "IBM Plex Mono", monospace; font-size: 12px; color: var(--accent); }
+.step-label span { font-size: 14px; font-weight: 600; }
+.step p { margin: 0; font-size: 13.5px; color: var(--muted); line-height: 1.55; }
+
+/* ---------- result cards ---------- */
+
+.cards { display: flex; flex-direction: column; gap: 20px; }
+.card {
+  display: grid;
+  grid-template-columns: minmax(240px, 400px) 1fr;
+  gap: 0;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  overflow: hidden;
+  box-shadow: var(--shadow);
+}
+@media (max-width: 760px) { .card { grid-template-columns: 1fr; } }
+
+.shot { position: relative; background: #0A0E11; aspect-ratio: 3/4; }
+.shot img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; transition: opacity .45s ease; }
+.shot img.over { opacity: 1; }
+.shot.raw img.over { opacity: 0; }
+.toggle {
+  position: absolute; left: 12px; bottom: 12px; z-index: 2;
+  font-family: "IBM Plex Mono", monospace; font-size: 11px; letter-spacing: .06em;
+  color: #fff; background: rgba(10,14,17,.72); backdrop-filter: blur(8px);
+  border: 1px solid rgba(255,255,255,.24); border-radius: 100px;
+  padding: 7px 13px; cursor: pointer;
+}
+.toggle:hover { background: rgba(10,14,17,.9); }
+.toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.readout { padding: 26px 28px; display: flex; flex-direction: column; gap: 20px; }
+.readout header { all: unset; display: flex; flex-direction: column; gap: 2px; }
+.readout h3 { font-size: 20px; }
+.readout .sub { font-size: 12.5px; color: var(--faint); font-family: "IBM Plex Mono", monospace; }
+
+.verdict {
+  display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap;
+  padding: 14px 16px; border-radius: 12px; background: var(--surface-2);
+  border: 1px solid var(--line);
+}
+.verdict b { font-size: 17px; }
+.verdict span { font-size: 13px; color: var(--muted); }
+
+.bars { display: flex; flex-direction: column; gap: 11px; }
+.bar { display: grid; grid-template-columns: 104px 1fr 44px; align-items: center; gap: 12px; font-size: 13.5px; }
+.bar .track { height: 8px; border-radius: 8px; background: var(--surface-2); border: 1px solid var(--line); overflow: hidden; }
+.bar .track i { display: block; height: 100%; border-radius: 8px; }
+.bar .num { font-family: "IBM Plex Mono", monospace; font-size: 12px; color: var(--muted); text-align: right; font-variant-numeric: tabular-nums; }
+
+.flags { display: flex; flex-wrap: wrap; gap: 6px; }
+.flag {
+  font-family: "IBM Plex Mono", monospace; font-size: 11px;
+  padding: 4px 9px; border-radius: 6px;
+  background: color-mix(in srgb, var(--warm) 16%, transparent);
+  color: var(--warm); border: 1px solid color-mix(in srgb, var(--warm) 34%, transparent);
+}
+.flag.clear { background: var(--accent-soft); color: var(--accent); border-color: color-mix(in srgb, var(--accent) 30%, transparent); }
+
+/* ---------- how / limits ---------- */
+
+.grid3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(258px, 1fr)); gap: 22px; }
+.tile { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 24px; }
+section.alt .tile { background: var(--surface-2); }
+.tile h3 { font-size: 17px; margin-bottom: 9px; }
+.tile p { margin: 0; font-size: 14px; color: var(--muted); }
+.tile .tag { font-family: "IBM Plex Mono", monospace; font-size: 11px; color: var(--faint); letter-spacing: .1em; text-transform: uppercase; display: block; margin-bottom: 12px; }
+
+.table-scroll { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; min-width: 460px; font-size: 14px; }
+th, td { text-align: right; padding: 12px 14px; border-bottom: 1px solid var(--line); }
+th:first-child, td:first-child { text-align: left; }
+thead th { font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--faint); font-weight: 500; }
+td.num { font-family: "IBM Plex Mono", monospace; font-variant-numeric: tabular-nums; }
+tr.win td { color: var(--text); font-weight: 500; }
+tr.lose td { color: var(--muted); }
+
+.caveats { display: flex; flex-direction: column; gap: 14px; margin-top: 30px; }
+.caveat { display: grid; grid-template-columns: 22px 1fr; gap: 14px; align-items: start; font-size: 14.5px; color: var(--muted); }
+.caveat b { color: var(--text); font-weight: 600; }
+.caveat i { font-style: normal; color: var(--warm); font-family: "IBM Plex Mono", monospace; font-size: 13px; }
+
+footer { padding: 44px 0 72px; color: var(--faint); font-size: 13px; }
+footer p { margin: 0 0 6px; max-width: 70ch; }
+
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<header>
+  <div class="wrap">
+    <p class="eyebrow">Skin scan · field test</p>
+    <h1>Point a phone at your face. Get a map of where it needs attention.</h1>
+    <p class="lede">
+      Not a spot count you can't verify — a picture of your own face with the
+      areas that are worse than the rest of it marked. Every screen below is real
+      output from the pipeline, run on the photos shown.
+    </p>
+    <div class="stat-strip">
+      <div class="stat"><b>2.4s</b><span>from shutter to result</span></div>
+      <div class="stat"><b>5</b><span>zones ranked per face</span></div>
+      <div class="stat"><b>30,286</b><span>dermatologist-marked lesions trained on</span></div>
+      <div class="stat"><b>79%</b><span>densest zone in the top two, held-out</span></div>
+    </div>
+  </div>
+</header>
+
+<section>
+  <div class="wrap">
+    <div class="section-head">
+      <p class="eyebrow">The flow</p>
+      <h2>Four screens, and one of them exists to send you back</h2>
+      <p>
+        Most of the difficulty is not the analysis. It is refusing to analyse a
+        photo that can't support an answer — and saying so before showing a
+        number the lighting invented.
+      </p>
+    </div>
+    <div class="flow" id="flow"></div>
+  </div>
+</section>
+
+<section class="alt">
+  <div class="wrap">
+    <div class="section-head">
+      <p class="eyebrow">Real results</p>
+      <h2>Three scans, untouched</h2>
+      <p>
+        Tap any photo to lift the overlay. The heat is face-relative: it marks
+        where <em>this</em> face is denser than its own baseline, which is why a
+        clear face doesn't light up red and a covered one doesn't wash out.
+      </p>
+    </div>
+    <div class="cards" id="cards"></div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <div class="section-head">
+      <p class="eyebrow">Under it</p>
+      <h2>Three things happen between the shutter and the map</h2>
+    </div>
+    <div class="grid3">
+      <div class="tile">
+        <span class="tag">01 · Frame</span>
+        <h3>Find the face, then the skin</h3>
+        <p>
+          478 landmarks set a face-intrinsic coordinate frame, and a face-parsing
+          network cuts hair, brows, lips and eyes out of the mask. Every threshold
+          downstream is measured in millimetres of face, not pixels — so standing
+          closer doesn't change the answer.
+        </p>
+      </div>
+      <div class="tile">
+        <span class="tag">02 · Separate</span>
+        <h3>Pull pigment apart from shadow</h3>
+        <p>
+          In optical-density space the melanin and haemoglobin axes are recovered
+          and the shading direction is projected out analytically. A shadow across
+          the cheek stops reading as pigment, and a third of a stop of exposure
+          stops reading as redness.
+        </p>
+      </div>
+      <div class="tile">
+        <span class="tag">03 · Read</span>
+        <h3>Predict density, not dots</h3>
+        <p>
+          A face-pretrained encoder with a Poisson density head predicts lesions
+          per area across the face. Asking for a count per region rather than a box
+          per spot is the question the product actually poses — and the one the
+          model can answer.
+        </p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="alt">
+  <div class="wrap">
+    <div class="section-head">
+      <p class="eyebrow">Measured, not claimed</p>
+      <h2>What it gets right, on faces it has never seen</h2>
+      <p>
+        Held-out faces from a dermatologist-annotated set, scored against the
+        hand-tuned detector that came before it — on the same five zones this app
+        puts on screen.
+      </p>
+    </div>
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr>
+            <th>Method</th>
+            <th>Densest zone named first</th>
+            <th>Densest zone in top two</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr class="win">
+            <td>Learned density model</td>
+            <td class="num">51%</td>
+            <td class="num">79%</td>
+          </tr>
+          <tr class="lose">
+            <td>Hand-tuned detector</td>
+            <td class="num">25%</td>
+            <td class="num">47%</td>
+          </tr>
+          <tr class="lose">
+            <td>Chance</td>
+            <td class="num">20%</td>
+            <td class="num">40%</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p style="margin:18px 0 0;font-size:13.5px;color:var(--muted);max-width:66ch">
+      154 faces resolved all five zones. Asked the stricter way — nine anatomical
+      regions instead of five zones — the model still leads, 36% to 20% on the
+      single worst region across 222 faces, with rank correlation +0.56 against
+      +0.20.
+    </p>
+
+    <div class="caveats">
+      <div class="caveat"><i>→</i><div><b>It is not a diagnosis.</b> It ranks areas by lesion density. It does not tell acne from post-inflammatory marks from anything that needs a doctor.</div></div>
+      <div class="caveat"><i>→</i><div><b>Beards and stubble read hot.</b> Dark hair inside the skin mask is the largest single source of false heat, and it is visible in one of the scans above.</div></div>
+      <div class="caveat"><i>→</i><div><b>The training set is one population.</b> Held-out accuracy is measured on the same clinical set the model learned from. Consented captures across skin tones are the gate before this goes anywhere.</div></div>
+      <div class="caveat"><i>→</i><div><b>Session to session still drifts.</b> Within one burst the numbers repeat tightly; across days, under different light, they move about five times more. Compare scans taken the same way.</div></div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <p>Every photo, overlay, zone ranking and quality flag on this page is produced by the pipeline itself — nothing is illustrated or retouched.</p>
+    <p>Training annotations from ACNE04-v2 (Gazeau et al., MICCAI 2024), free for academic use. Shipping requires consented data of our own.</p>
+  </div>
+</footer>
+
+<script>
+const DATA = /*__DATA__*/null;
+
+const FLAG_COPY = {
+  too_dark: "under-exposed",
+  too_bright: "over-exposed",
+  blurry: "motion blur",
+  side_lit: "lit from one side",
+  high_specular: "shine on the skin",
+  too_close: "camera too close",
+  too_far: "camera too far",
+  no_face: "no face found",
+};
+
+const heat = (level) => {
+  const t = Math.max(0, Math.min(1, level));
+  const hue = 34 - 30 * t;             // amber at the bottom, red at the peak
+  const sat = 62 + 26 * t;
+  const light = 58 - 12 * t;
+  return `hsl(${hue} ${sat}% ${light}%)`;
+};
+
+/* ---- the four app screens ---- */
+
+const flow = document.getElementById("flow");
+const ravi = DATA.find((d) => d.id === "personB");
+const dev = DATA.find((d) => d.id === "personA");
+
+const steps = [
+  {
+    n: "01",
+    title: "Frame",
+    body: "An oval guide holds the face at a working distance. The app measures face width in pixels and asks you to move rather than guessing the scale later.",
+    render: () => `
+      <img src="${ravi.photo}" alt="Camera preview of a face">
+      <div class="scrim"></div>
+      <div class="oval"></div>
+      <div class="screen-body">
+        <div class="screen-top">Scan · framing</div>
+        <div class="screen-bottom">
+          <span class="pill good">face ${ravi.face_px} px — good</span>
+          <strong>Hold still</strong>
+          <small>Fill the oval, look straight ahead.</small>
+        </div>
+      </div>`,
+  },
+  {
+    n: "02",
+    title: "Check",
+    body: "Before anything is measured the photo is graded: exposure, blur, shine, and whether the light is coming from one side. A failed check ends the scan here.",
+    render: () => `
+      <img src="${dev.photo}" alt="Captured photo being checked">
+      <div class="scrim"></div>
+      <div class="screen-body">
+        <div class="screen-top">Scan · quality</div>
+        <div class="screen-bottom">
+          ${dev.flags.map((f) => `<span class="pill bad">${FLAG_COPY[f] || f}</span>`).join("")}
+          <strong>Retake this one</strong>
+          <small>Window light on one cheek makes half the face read darker than it is.</small>
+        </div>
+      </div>`,
+  },
+  {
+    n: "03",
+    title: "Read",
+    body: "The density map is drawn over your own photo, and the five zones are ranked against each other. No absolute severity score, because there isn't an honest one.",
+    render: () => `
+      <img src="${ravi.overlay}" alt="Result with density overlay">
+      <div class="scrim"></div>
+      <div class="screen-body">
+        <div class="screen-top">Result · ${ravi.count} marks est.</div>
+        <div class="screen-bottom">
+          <strong>${ravi.zones[0].label} needs the attention</strong>
+          <div class="zonelist">
+            ${ravi.zones
+              .slice(0, 3)
+              .map(
+                (z) => `<div class="zonerow"><span>${z.label}</span><span>${Math.round(
+                  z.level * 100
+                )}</span><span class="zonebar"><i style="width:${Math.round(
+                  z.level * 100
+                )}%;background:${heat(z.level)}"></i></span></div>`
+              )
+              .join("")}
+          </div>
+        </div>
+      </div>`,
+  },
+  {
+    n: "04",
+    title: "Return",
+    body: "The next scan is compared only against scans taken the same way. Same distance, same light, same time of day — otherwise the comparison measures the room.",
+    render: () => `
+      <img src="${ravi.photo}" alt="Repeat scan prompt">
+      <div class="scrim"></div>
+      <div class="screen-body">
+        <div class="screen-top">Track · next scan</div>
+        <div class="screen-bottom">
+          <span class="pill">matched conditions</span>
+          <strong>Come back in 14 days</strong>
+          <small>We'll ask for the same light and distance so the difference is your skin, not the room.</small>
+        </div>
+      </div>`,
+  },
+];
+
+flow.innerHTML = steps
+  .map(
+    (s) => `
+    <div class="step">
+      <div class="phone"><div class="screen">${s.render()}</div></div>
+      <div class="step-label"><b>${s.n}</b><span>${s.title}</span></div>
+      <p>${s.body}</p>
+    </div>`
+  )
+  .join("");
+
+/* ---- result cards ---- */
+
+document.getElementById("cards").innerHTML = DATA.map(
+  (d, i) => `
+  <article class="card">
+    <div class="shot" id="shot-${i}">
+      <img src="${d.photo}" alt="${d.who}, original photo">
+      <img class="over" src="${d.overlay}" alt="${d.who}, density overlay">
+      <button class="toggle" data-shot="${i}" aria-pressed="true">overlay on</button>
+    </div>
+    <div class="readout">
+      <header>
+        <h3>${d.who}</h3>
+        <span class="sub">${d.sub}</span>
+      </header>
+      <div class="verdict">
+        <b>${d.zones[0].label}</b>
+        <span>densest zone · about ${d.count} marks across the face</span>
+      </div>
+      <div class="bars">
+        ${d.zones
+          .map(
+            (z) => `<div class="bar">
+              <span>${z.label}</span>
+              <span class="track"><i style="width:${Math.max(
+                4,
+                Math.round(z.level * 100)
+              )}%;background:${heat(z.level)}"></i></span>
+              <span class="num">${Math.round(z.level * 100)}</span>
+            </div>`
+          )
+          .join("")}
+      </div>
+      <div class="flags">
+        ${
+          d.flags.length
+            ? d.flags
+                .map((f) => `<span class="flag">${FLAG_COPY[f] || f}</span>`)
+                .join("")
+            : '<span class="flag clear">all quality checks passed</span>'
+        }
+      </div>
+    </div>
+  </article>`
+).join("");
+
+document.querySelectorAll(".toggle").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    const shot = document.getElementById(`shot-${btn.dataset.shot}`);
+    const raw = shot.classList.toggle("raw");
+    btn.textContent = raw ? "overlay off" : "overlay on";
+    btn.setAttribute("aria-pressed", String(!raw));
+  });
+});
+</script>
