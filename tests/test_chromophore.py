@@ -315,7 +315,7 @@ def test_burden_rises_with_injected_pigment(analysed, full_config: Config) -> No
     # yields coordinate pairs that are not skin pixels at all.
     picks = np.linspace(0, len(rows) - 1, 40).astype(int)
     discs = np.zeros(skin.shape, dtype=np.uint8)
-    for row, col in zip(rows[picks], cols[picks]):
+    for row, col in zip(rows[picks], cols[picks], strict=True):
         cv2.circle(discs, (int(col), int(row)), 6, 1, -1)
     # Darken existing skin rather than painting a flat colour. Painting black
     # would put every disc below `clipped_below`, so `_valid_pixels` would drop

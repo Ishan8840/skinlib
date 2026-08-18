@@ -10,7 +10,6 @@ import pytest
 from skinlib import landmarks as lm
 from skinlib.config import Config
 from skinlib.detect import detect_face, load_image
-from skinlib.parse import parse_skin
 from skinlib.regions import build_region_polygons, build_regions
 from skinlib.types import REGION_NAMES
 

@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import cv2
 import numpy as np
-import pytest
 
 from skinlib.config import Config
 from skinlib.metrics import compute_metrics
@@ -75,7 +74,7 @@ def test_local_red_lesions_do_register(analysed, full_config: Config) -> None:
     rows, cols = np.nonzero(skin)
     picks = np.linspace(0, len(rows) - 1, 40).astype(int)
     discs = np.zeros(skin.shape, dtype=np.uint8)
-    for row, col in zip(rows[picks], cols[picks]):
+    for row, col in zip(rows[picks], cols[picks], strict=True):
         cv2.circle(discs, (int(col), int(row)), 6, 1, -1)
     spot = discs.astype(bool) & skin
     # Redder and slightly darker, which is what an inflamed papule looks like.

@@ -12,7 +12,6 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from skinlib.config import Config
 from skinlib.derived import ASYMMETRY_PAIRS, asymmetry, periorbital_decomposition
 from skinlib.geometry import (
     depth_surface,

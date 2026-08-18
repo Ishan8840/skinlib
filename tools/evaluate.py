@@ -20,6 +20,7 @@ handful would be enough to set one honestly.
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 from pathlib import Path
 
@@ -58,6 +59,24 @@ def extract_labels(labelled: np.ndarray) -> list[tuple[float, float]]:
         ys, xs = np.nonzero(filled)
         centres.append((float(xs.mean()), float(ys.mean())))
     return centres
+
+
+def load_json_labels(path: Path, kind: str) -> list[tuple[float, float]]:
+    """Mark centres from a ``tools/label.py`` export, in the photo's own pixels.
+
+    Preferred over the red-outline PNG. The colour route was built for hand-drawn
+    annotations and keys on saturated red, which means anything red already in the
+    photograph is read as an annotation: on the first real labelled face it
+    invented three marks from the background, inflating the false-negative count
+    and understating recall by a third. Exact coordinates cannot do that, and
+    need no registration step either.
+
+    ``kind`` selects which detector is being scored — the two answer different
+    questions and must not be scored against a merged label set.
+    """
+    data = json.loads(path.read_text())
+    marks = [m for m in data["marks"] if kind == "all" or m.get("type", "mark") == kind]
+    return [(float(m["x"]), float(m["y"])) for m in marks]
 
 
 def register(labelled: np.ndarray, working: np.ndarray, config: Config) -> np.ndarray:
@@ -119,36 +138,52 @@ def score(detections, truth: np.ndarray, radius: float) -> dict[str, float]:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("photo", type=Path)
-    parser.add_argument("labelled", type=Path)
+    parser.add_argument("labelled", type=Path,
+                        help="a .labels.json from tools/label.py (preferred), "
+                             "or a PNG with red outlines")
+    parser.add_argument("--kind", choices=("mark", "lesion", "all"), default="mark",
+                        help="which label type to score (JSON labels only)")
     parser.add_argument("--radius", type=float, default=15.0, help="match distance in px")
     parser.add_argument("--sweep", action="store_true", help="sweep threshold_mad")
     args = parser.parse_args(argv)
 
     config = Config()
-    labelled = cv2.imread(str(args.labelled), cv2.IMREAD_COLOR)
-    if labelled is None:
-        raise SystemExit(f"could not read {args.labelled}")
+    loaded = load_image(args.photo, config.io)
+    working = loaded.image
 
-    working = load_image(args.photo, config.io).image
-    truth_local = extract_labels(labelled)
-    if not truth_local:
-        raise SystemExit("no red outlines found; are the annotations saturated enough?")
-
-    matrix = register(labelled, working, config)
-    truth = cv2.transform(np.array(truth_local, np.float32)[:, None, :], matrix).reshape(-1, 2)
-    print(f"labelled marks: {len(truth)}   match radius: {args.radius:.0f}px\n")
+    if args.labelled.suffix.lower() == ".json":
+        # Exact coordinates, in SOURCE pixels. The working image is downscaled,
+        # so they are scaled by the same factor rather than registered — there
+        # is nothing to register, they came from this photo.
+        truth_local = load_json_labels(args.labelled, args.kind)
+        if not truth_local:
+            raise SystemExit(f"no labels of kind '{args.kind}' in {args.labelled}")
+        truth = np.array(truth_local, np.float32) * loaded.scale
+        print(f"labels: {len(truth)} of kind '{args.kind}'  (scaled by {loaded.scale:.4f})")
+    else:
+        labelled = cv2.imread(str(args.labelled), cv2.IMREAD_COLOR)
+        if labelled is None:
+            raise SystemExit(f"could not read {args.labelled}")
+        truth_local = extract_labels(labelled)
+        if not truth_local:
+            raise SystemExit("no red outlines found; are the annotations saturated enough?")
+        matrix = register(labelled, working, config)
+        truth = cv2.transform(np.array(truth_local, np.float32)[:, None, :], matrix).reshape(-1, 2)
+        print(f"labelled marks: {len(truth)}")
+    print(f"match radius: {args.radius:.0f}px\n")
 
     result = analyze(args.photo, config=config)
-    outcome = score(result.spots, truth, args.radius)
+    detected = result.lesions if args.kind == "lesion" else result.spots
+    outcome = score(detected, truth, args.radius)
     matched = set(outcome["matched"])
 
-    print(f"threshold_mad={config.spots.threshold_mad}: {len(result.spots)} detections")
+    print(f"threshold_mad={config.spots.threshold_mad}: {len(detected)} detections")
     print(
         f"  TP={outcome['tp']}  FP={outcome['fp']}  FN={outcome['fn']}   "
         f"precision={outcome['precision']:.2f}  recall={outcome['recall']:.2f}  "
         f"F1={outcome['f1']:.2f}"
     )
-    for index, spot in enumerate(result.spots):
+    for index, spot in enumerate(detected):
         tag = "TP" if index in matched else "FP"
         print(f"   [{tag}] {spot.region or '(none)':18s} {spot.area_px:4d}px")
 
@@ -157,7 +192,8 @@ def main(argv: list[str] | None = None) -> int:
               f"{'prec':>5s} {'rec':>5s} {'F1':>5s}")
         for mad in (3.0, 2.8, 2.5, 2.2, 2.0, 1.8, 1.6, 1.4):
             tuned = replace(config, spots=replace(config.spots, threshold_mad=mad))
-            spots = analyze(args.photo, config=tuned).spots
+            tuned_result = analyze(args.photo, config=tuned)
+            spots = tuned_result.lesions if args.kind == "lesion" else tuned_result.spots
             row = score(spots, truth, args.radius)
             print(
                 f"{mad:5.1f} {len(spots):4d} {row['tp']:3d} {row['fp']:3d} {row['fn']:3d} "

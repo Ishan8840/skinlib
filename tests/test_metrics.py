@@ -10,7 +10,7 @@ import numpy as np
 import pytest
 
 from skinlib.color import apply_gains, correct_color, sclera_white_balance, shades_of_gray
-from skinlib.config import ColorConfig, Config, MetricsConfig
+from skinlib.config import ColorConfig, Config
 from skinlib.metrics import (
     band_pass,
     compute_metrics,

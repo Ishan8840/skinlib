@@ -12,6 +12,35 @@ from __future__ import annotations
 #   MAJOR  incompatible result shape (metric added/removed/renamed, region set changed)
 #   MINOR  output values can shift (threshold default, mask model, algorithm change)
 #   PATCH  provably value-preserving (docs, typing, refactor with byte-identical output)
+# 10.0.0 Spot detection: minimum mark size is stated PHYSICALLY (1.2mm,
+#        converted through apparent face width) instead of as 8 pixels, and
+#        the mask-boundary margin likewise. A pixel floor means ~1.6mm on a
+#        close capture and ~0.4mm on a distant one, so the same setting admits
+#        sub-pore noise at one distance and rejects real marks at another.
+#        Scored against the first hand-labelled face (6 marks, via the new
+#        tools/label.py, with tools/evaluate.py taught to read its JSON):
+#          min mark    det   TP   FP   precision  recall    F1
+#          0.4mm (old)  31    4   27     0.13      0.67     0.22
+#          1.2mm (new)   4    2    2     0.50      0.33     0.40
+#        Chosen for PRECISION over F1: a wrong circle on someone's face costs
+#        more than a missed one, because it teaches the user to distrust
+#        everything else on screen. That is not hypothetical — it is what the
+#        old default did to the first person who looked at its output.
+#        !! F1 DOES NOT EXCEED 0.40 AT ANY SETTING, swept across threshold_mad
+#        !! 1.4-3.0, size 0.4-2.2mm, edge margin 0.6-3% of face width, and
+#        !! working resolution 1536-3088. Every configuration lands on one
+#        !! fixed trade curve; parameters slide along it and nothing moves it.
+#        !! Real marks and boundary artifacts overlap in size AND contrast, so
+#        !! this detector cannot separate them. `spot_count` and the Spot
+#        !! records are INDICATIVE. Track `spot_burden`, which never decides
+#        !! whether a single pixel is a mark and measures CV 0.007 against the
+#        !! count's 0.206 from the identical residual map.
+#        Also fixed in tools/evaluate.py: it found ground truth by detecting
+#        saturated red, so red content in the PHOTOGRAPH became phantom labels
+#        — three of them on the first real face, understating recall by a
+#        third. It now reads exact coordinates, which also removes the
+#        registration step entirely.
+#        MAJOR: spot_count and spot_area_fraction change substantially.
 # 9.0.0  Completes the sweep for absolute thresholds on brightness-dependent
 #        quantities — the defect pattern behind `too_dark` (8.0.0) and
 #        `blurry`. Every remaining QualityConfig threshold was measured against
@@ -200,4 +229,4 @@ from __future__ import annotations
 #        measured noise floor of 0.13). Spot detection: MAD-based threshold,
 #        absolute minimum area, shape tests gated on area, whole-component
 #        boundary rejection. All of these shift stored values.
-PREPROCESSING_VERSION: str = "9.0.0"
+PREPROCESSING_VERSION: str = "10.0.0"

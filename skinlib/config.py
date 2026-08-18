@@ -652,10 +652,41 @@ class SpotsConfig:
     threshold_sigma: float = 2.2
     threshold_absolute: float = 0.02
 
-    # Area filters, as a fraction of skin mask area, with an absolute floor.
-    # The fraction alone scales sensibly on a full-resolution capture but
-    # collapses on a small one: on a 768px photo it worked out to 1.9px, so
-    # 3-pixel components were reaching the shape tests.
+    # -- minimum mark size, stated PHYSICALLY --
+    #
+    # A pixel floor is the wrong unit. 8px is ~1.6mm on a face filling the frame
+    # and ~0.4mm on one at arm's length, so the same setting admits sub-pore
+    # noise at one distance and rejects real marks at another. Same defect as
+    # the four quality flags fixed in 8.0.0 and 9.0.0: an absolute threshold on
+    # a quantity that scales with capture geometry.
+    #
+    # Scored against the first hand-labelled face (6 marks, tools/label.py):
+    #
+    #   min mark   detections   TP   FP   precision   recall    F1
+    #   0.4mm (old)      31      4   27      0.13      0.67    0.22
+    #   0.8mm             8      2    6      0.25      0.33    0.29
+    #   1.2mm             4      2    2      0.50      0.33    0.40
+    #   2.2mm             1      1    0      1.00      0.17    0.29
+    #
+    # 1.2mm is chosen for PRECISION, not F1. Drawing a circle on someone's face
+    # asserts "this is a mark"; a wrong circle costs more than a missed one,
+    # because it teaches the user to distrust everything else on the screen.
+    #
+    # !! F1 DOES NOT EXCEED 0.40 AT ANY SETTING. Swept across threshold_mad
+    # !! 1.4-3.0, minimum size 0.4-2.2mm, edge margin 0.6-3% of face width, and
+    # !! working resolution 1536-3088: every configuration lands on one fixed
+    # !! trade curve. Parameters slide along it; nothing moves it. Real marks
+    # !! and boundary artifacts overlap in size and in contrast, so this
+    # !! detector cannot separate them. Treat `spot_count` and the Spot records
+    # !! as INDICATIVE — use `spot_burden`, which never has to decide whether
+    # !! any single pixel is a mark, and measures CV 0.007 against the count's
+    # !! 0.206 from the very same map.
+    min_mark_mm: float = 1.2
+    # Face width used to convert millimetres to pixels. An adult face is
+    # 135-150mm bizygomatic; 140 is the middle and the error from using a
+    # constant is far smaller than the error from using pixels.
+    assumed_face_width_mm: float = 140.0
+    # Retained as a floor for callers with no face measurement to scale by.
     min_area_frac: float = 2.5e-5
     min_area_px: int = 8
     max_area_frac: float = 6.0e-3
@@ -673,6 +704,14 @@ class SpotsConfig:
     # Mask-boundary rejection. The boundary is where the hairline, lash line
     # and nostril rims meet the mask, and all three produce residual that looks
     # exactly like a spot.
+    # As a fraction of face width, for the same reason the size floor is: 4px
+    # is a hair's width on a full-resolution capture and a third of the lash
+    # line on a small one. At 1536px working resolution, widening this from 4px
+    # to 20px removed 9 false positives at zero cost to recall. At full
+    # resolution it makes no measurable difference, because the physical size
+    # floor above already removes everything that sits on a boundary.
+    mask_edge_margin_face_frac: float = 0.012
+    # Fallback when no face width is available.
     mask_edge_margin_px: int = 4
     # Fraction of a component's pixels that must lie clear of that boundary.
     # Testing the centroid alone is not enough: an observed 229px false

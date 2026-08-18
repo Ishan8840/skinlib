@@ -23,12 +23,35 @@ from .types import Face, Lesion, Spot
 
 __all__ = [
     "detect_lesions",
+    "mask_edge_margin",
+    "min_mark_area",
     "detect_spots",
     "hemoglobin_residual",
     "local_residual",
     "melanin_residual",
     "residual_reference",
 ]
+
+
+def min_mark_area(face: Face | None, config: SpotsConfig) -> float:
+    """Minimum component area in pixels, from a physical mark size.
+
+    A mark of ``min_mark_mm`` across, converted through the face's apparent
+    width, so the same physical size is required at every capture distance.
+    Falls back to the absolute pixel floor when the face carries no width.
+    """
+    if face is None or not face.width:
+        return float(config.min_area_px)
+    px_per_mm = float(face.width) / config.assumed_face_width_mm
+    diameter = config.min_mark_mm * px_per_mm
+    return max(float(config.min_area_px), np.pi / 4.0 * diameter * diameter)
+
+
+def mask_edge_margin(face: Face | None, config: SpotsConfig) -> int:
+    """Boundary clearance in pixels, as a fraction of face width."""
+    if face is None or not face.width:
+        return int(config.mask_edge_margin_px)
+    return max(1, int(round(config.mask_edge_margin_face_frac * float(face.width))))
 
 
 def _odd(value: int, minimum: int = 3) -> int:
@@ -193,6 +216,7 @@ def _components(
     spots_config: SpotsConfig,
     regions: dict[str, np.ndarray] | None,
     extra_reject=None,
+    face: Face | None = None,
 ) -> list[tuple]:
     """Threshold a residual, componentise it, and apply the shape/position filters.
 
@@ -215,14 +239,17 @@ def _components(
     # Components must sit clear of the mask boundary. The boundary is where
     # nostril rims, the lash line and the hairline meet the mask, and all three
     # produce residual indistinguishable from a real feature.
-    interior = regions_module.erode(skin_mask, spots_config.mask_edge_margin_px)
+    interior = regions_module.erode(skin_mask, mask_edge_margin(face, spots_config))
 
     count, labels = cv2.connectedComponents(candidates.astype(np.uint8), connectivity=8)
     if count <= 1:
         return []
 
     skin_area = int(skin_mask.sum())
-    min_area = max(float(spots_config.min_area_px), spots_config.min_area_frac * skin_area)
+    min_area = max(
+        min_mark_area(face, spots_config),
+        spots_config.min_area_frac * skin_area,
+    )
     max_area = spots_config.max_area_frac * skin_area
 
     from skimage.measure import regionprops
@@ -321,7 +348,7 @@ def detect_lesions(
             region=region,
         )
         for centroid, bbox, area, area_fraction, intensity, contrast, eccentricity, region
-        in _components(residual, hemoglobin, skin_mask, config.spots, regions)
+        in _components(residual, hemoglobin, skin_mask, config.spots, regions, face=face)
     ]
 
     # Fully specified ordering, as for spots: area alone leaves ties, and tied
@@ -385,7 +412,7 @@ def detect_spots(
             region=region,
         )
         for centroid, bbox, area, area_fraction, intensity, contrast, eccentricity, region
-        in _components(residual, melanin, skin_mask, spots_config, regions, reject)
+        in _components(residual, melanin, skin_mask, spots_config, regions, reject, face=face)
     ]
 
     # Fully specified ordering. Area alone leaves ties, and tied records would
