@@ -682,6 +682,22 @@ class SpotsConfig:
     # !! any single pixel is a mark, and measures CV 0.007 against the count's
     # !! 0.206 from the very same map.
     min_mark_mm: float = 1.2
+    # Inflammatory lesions are BIGGER than pigmented marks — a papule is
+    # typically 2-5mm where a mark is 1-3mm — so the two detectors need
+    # different floors. They shared one until the first lesion ground truth
+    # existed (37 hand-labelled lesions on one face) and showed a clean optimum
+    # well above the mark threshold:
+    #
+    #   min mm   det   TP   FP   precision  recall    F1
+    #      1.2    70   17   53     0.24      0.46    0.32   <- shared floor
+    #      1.6    45   16   29     0.36      0.43    0.39
+    #      2.0    35   16   19     0.46      0.43    0.44   <- peak
+    #      2.4    26   12   14     0.46      0.32    0.38
+    #      3.2    18   10    8     0.56      0.27    0.36
+    #
+    # Weaker evidence than the mark threshold, which is pooled over 49 marks on
+    # five faces: this is 37 lesions on ONE. Re-check on a second face.
+    min_lesion_mm: float = 2.0
     # Face width used to convert millimetres to pixels. An adult face is
     # 135-150mm bizygomatic; 140 is the middle and the error from using a
     # constant is far smaller than the error from using pixels.

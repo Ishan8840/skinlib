@@ -1,0 +1,13 @@
+{
+  "image": "personB.jpg",
+  "width": 2316,
+  "height": 3088,
+  "marks": [
+    {
+      "x": 810,
+      "y": 1283,
+      "r": 25,
+      "type": "mark"
+    }
+  ]
+}

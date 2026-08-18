@@ -12,6 +12,37 @@ from __future__ import annotations
 #   MAJOR  incompatible result shape (metric added/removed/renamed, region set changed)
 #   MINOR  output values can shift (threshold default, mask model, algorithm change)
 #   PATCH  provably value-preserving (docs, typing, refactor with byte-identical output)
+# 11.0.0 Ground truth, at last: 49 hand-labelled marks across FIVE faces and
+#        37 labelled lesions, against the 6 marks on one face that set 10.0.0.
+#        Two findings.
+#        (1) `min_mark_mm` = 1.2 is CONFIRMED. Pooled over all five faces the
+#        F1 optimum lands exactly there — it could as easily have come out at
+#        0.8 or 2.0 and shown the value was fitted to one person:
+#          mm    prec  rec    F1
+#          0.4   0.13  0.58  0.21
+#          1.0   0.25  0.48  0.33
+#          1.2   0.37  0.44  0.40  <- default, confirmed
+#          1.5   0.43  0.36  0.39
+#          2.0   0.62  0.20  0.30
+#        The F1 ceiling of 0.40 is also confirmed across five faces and four
+#        people, so it is a property of the method rather than of one face.
+#        (2) Lesions need their OWN floor, added as `min_lesion_mm` = 2.0. An
+#        inflammatory papule is 2-5mm where a pigmented mark is 1-3mm, and the
+#        first lesion ground truth shows a clean optimum well above the mark
+#        threshold (F1 0.32 -> 0.44 going 1.2mm -> 2.0mm, peaking there and
+#        falling to 0.36 by 3.2mm). It also separates faces better: an
+#        acne-affected face against a clear one went from 4.4x the lesion count
+#        to 17.5x.
+#        CAVEAT: the mark threshold is pooled over five faces; the lesion
+#        threshold is 37 labels on ONE. Re-check it on a second face.
+#        New tools/benchmark.py scores every metric against a folder-per-class
+#        labelled corpus by one-vs-rest AUC. On 4,235 public images only
+#        `roughness` passes (0.756); spot_burden is chance (0.537) and
+#        melanin_density, hemoglobin_density and erythema_index rank their own
+#        target class LAST of five. Those are web images where class correlates
+#        with camera and skin tone, so it does not prove the metrics wrong
+#        under controlled capture — it proves nobody has shown them right.
+#        MAJOR: lesion counts change substantially.
 # 10.0.0 Spot detection: minimum mark size is stated PHYSICALLY (1.2mm,
 #        converted through apparent face width) instead of as 8 pixels, and
 #        the mask-boundary margin likewise. A pixel floor means ~1.6mm on a
@@ -229,4 +260,4 @@ from __future__ import annotations
 #        measured noise floor of 0.13). Spot detection: MAD-based threshold,
 #        absolute minimum area, shape tests gated on area, whole-component
 #        boundary rejection. All of these shift stored values.
-PREPROCESSING_VERSION: str = "10.0.0"
+PREPROCESSING_VERSION: str = "11.0.0"

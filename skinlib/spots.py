@@ -33,17 +33,26 @@ __all__ = [
 ]
 
 
-def min_mark_area(face: Face | None, config: SpotsConfig) -> float:
-    """Minimum component area in pixels, from a physical mark size.
+def min_mark_area(
+    face: Face | None, config: SpotsConfig, millimetres: float | None = None
+) -> float:
+    """Minimum component area in pixels, from a physical feature size.
 
-    A mark of ``min_mark_mm`` across, converted through the face's apparent
-    width, so the same physical size is required at every capture distance.
-    Falls back to the absolute pixel floor when the face carries no width.
+    A feature of ``millimetres`` across (default ``min_mark_mm``), converted
+    through the face's apparent width, so the same physical size is required at
+    every capture distance. Falls back to the absolute pixel floor when the face
+    carries no width.
+
+    ``millimetres`` is a parameter because the two detectors want different
+    sizes: an inflammatory papule is 2-5mm where a pigmented mark is 1-3mm, and
+    scored against ground truth the lesion optimum sits at 2.0mm against the
+    mark's 1.2mm.
     """
     if face is None or not face.width:
         return float(config.min_area_px)
+    size = config.min_mark_mm if millimetres is None else millimetres
     px_per_mm = float(face.width) / config.assumed_face_width_mm
-    diameter = config.min_mark_mm * px_per_mm
+    diameter = size * px_per_mm
     return max(float(config.min_area_px), np.pi / 4.0 * diameter * diameter)
 
 
@@ -217,6 +226,7 @@ def _components(
     regions: dict[str, np.ndarray] | None,
     extra_reject=None,
     face: Face | None = None,
+    millimetres: float | None = None,
 ) -> list[tuple]:
     """Threshold a residual, componentise it, and apply the shape/position filters.
 
@@ -247,7 +257,7 @@ def _components(
 
     skin_area = int(skin_mask.sum())
     min_area = max(
-        min_mark_area(face, spots_config),
+        min_mark_area(face, spots_config, millimetres),
         spots_config.min_area_frac * skin_area,
     )
     max_area = spots_config.max_area_frac * skin_area
@@ -348,7 +358,8 @@ def detect_lesions(
             region=region,
         )
         for centroid, bbox, area, area_fraction, intensity, contrast, eccentricity, region
-        in _components(residual, hemoglobin, skin_mask, config.spots, regions, face=face)
+        in _components(residual, hemoglobin, skin_mask, config.spots, regions, face=face,
+                       millimetres=config.spots.min_lesion_mm)
     ]
 
     # Fully specified ordering, as for spots: area alone leaves ties, and tied
